@@ -1,4 +1,4 @@
-đồng bộ hóa error_response trong các contract
+thêm name trong order-crud (phụ)
 cải thiện UI
 vẽ dependency graph
 làm tài liệu hướng dẫn

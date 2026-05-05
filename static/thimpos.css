@@ -75,7 +75,7 @@ body {
     padding: 20px;
     box-sizing: border-box;
     overflow-x: auto;
-    margin-top: 56px; /* thêm dòng này */
+    margin-top: 56px;
 }
 
 /* ========== Navbar ========== */
@@ -94,6 +94,7 @@ body {
     z-index: 1000;
 }
 
+/* left */
 .tp-navbar-left {
     display: flex;
     align-items: center;
@@ -111,4 +112,82 @@ body {
     color: white;
     font-weight: bold;
     letter-spacing: 0.5px;
+}
+
+/* right (FIX chính) */
+.tp-navbar-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+}
+
+/* auth container */
+.tp-auth-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* username badge */
+.tp-user-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+
+    padding: 6px 12px;
+    border-radius: 999px;
+
+    background: rgba(37, 99, 235, 0.15);
+    color: #60a5fa;
+
+    font-weight: 600;
+    font-size: 13px;
+
+    border: 1px solid rgba(37, 99, 235, 0.4);
+    transition: 0.15s;
+}
+
+.tp-user-badge:hover {
+    background: rgba(37, 99, 235, 0.25);
+}
+
+/* ========== Buttons ========== */
+.tp-btn {
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: 0.15s;
+}
+
+/* primary */
+.tp-btn-primary {
+    background: var(--tp-active);
+    color: white;
+}
+
+.tp-btn-primary:hover {
+    background: #1d4ed8;
+}
+
+/* ghost */
+.tp-btn-ghost {
+    background: transparent;
+    color: var(--tp-text);
+}
+
+.tp-btn-ghost:hover {
+    background: var(--tp-hover);
+}
+
+/* danger */
+.tp-btn-danger {
+    background: #dc2626;
+    color: white;
+}
+
+.tp-btn-danger:hover {
+    background: #b91c1c;
 }
