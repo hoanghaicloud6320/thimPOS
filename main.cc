@@ -13,12 +13,14 @@ int main()
     {
         thimpos::license::KeyManagerClient verifier;
         const auto license = verifier.verifyAtStartup();
-        std::cout << "License accepted for " << license.registrantName
-                  << " (expires " << license.expiresAt << ")\n";
+        std::cout << "Bản quyền hợp lệ: " << license.registrantName
+                  << " (hết hạn " << license.expiresAt << ")\n";
     }
     catch (const std::exception &error)
     {
-        std::cerr << "ThimPOS cannot start: " << error.what() << '\n';
+        std::cerr << "\nLỖI BẢN QUYỀN: "
+                  << thimpos::license::formatLicenseError(error.what()) << '\n';
+        std::cerr << "ThimPOS chưa được khởi chạy.\n";
         return EXIT_FAILURE;
     }
 #else

@@ -10,15 +10,29 @@
 #include <openssl/rand.h>
 #include <array>
 #include <chrono>
-#include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <iostream>
 #include <memory>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string_view>
+#include <type_traits>
 #include <vector>
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <wincrypt.h>
+#else
+#include <pwd.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 
 namespace thimpos::license
 {
@@ -26,6 +40,8 @@ namespace
 {
 constexpr double kRequestTimeoutSeconds = 10.0;
 constexpr auto kMaximumOfflineWindow = std::chrono::hours(24 * 7);
+constexpr std::string_view kApiUrl =
+    "https://keymanager-cloud.thuanvatlyhy.workers.dev";
 
 using JsonPtr = std::shared_ptr<Json::Value>;
 
@@ -43,10 +59,13 @@ struct Cache
     std::string deviceId;
 };
 
-std::string environment(const char *name)
+std::string trim(std::string value)
 {
-    const auto *value = std::getenv(name);
-    return value == nullptr ? std::string{} : std::string(value);
+    const auto first = value.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos)
+        return {};
+    const auto last = value.find_last_not_of(" \t\r\n");
+    return value.substr(first, last - first + 1);
 }
 
 Json::Value parseJson(const std::string &text, std::string_view context)
@@ -312,34 +331,196 @@ std::string apiError(const HttpResult &result)
     return "KEY_MANAGER_HTTP_" + std::to_string(result.status);
 }
 
-std::optional<Cache> loadCache(const std::filesystem::path &path)
+#ifdef _WIN32
+constexpr wchar_t kRegistryPath[] = L"Software\\ThimPOS";
+constexpr wchar_t kRegistryValue[] = L"LicenseCache";
+constexpr char kDpapiEntropy[] = "ThimPOS license cache v1";
+
+struct LocalMemoryDeleter
 {
-    std::ifstream input(path, std::ios::binary);
+    void operator()(unsigned char *value) const
+    {
+        if (value)
+            LocalFree(value);
+    }
+};
+
+std::optional<std::string> readStoredCache()
+{
+    HKEY key = nullptr;
+    const auto opened = RegOpenKeyExW(
+        HKEY_CURRENT_USER, kRegistryPath, 0, KEY_QUERY_VALUE, &key);
+    if (opened == ERROR_FILE_NOT_FOUND)
+        return std::nullopt;
+    if (opened != ERROR_SUCCESS)
+        throw std::runtime_error("LICENSE_STORAGE_READ_FAILED");
+    std::unique_ptr<std::remove_pointer_t<HKEY>, decltype(&RegCloseKey)> registryKey(
+        key, RegCloseKey);
+
+    DWORD type = 0;
+    DWORD size = 0;
+    auto status = RegQueryValueExW(
+        registryKey.get(), kRegistryValue, nullptr, &type, nullptr, &size);
+    if (status == ERROR_FILE_NOT_FOUND)
+        return std::nullopt;
+    if (status != ERROR_SUCCESS || type != REG_BINARY || size == 0)
+        throw std::runtime_error("LICENSE_STORAGE_READ_FAILED");
+    std::vector<unsigned char> encrypted(size);
+    status = RegQueryValueExW(registryKey.get(),
+                              kRegistryValue,
+                              nullptr,
+                              &type,
+                              encrypted.data(),
+                              &size);
+    if (status != ERROR_SUCCESS)
+        throw std::runtime_error("LICENSE_STORAGE_READ_FAILED");
+
+    DATA_BLOB input{static_cast<DWORD>(encrypted.size()), encrypted.data()};
+    DATA_BLOB entropy{static_cast<DWORD>(sizeof(kDpapiEntropy) - 1),
+                      reinterpret_cast<BYTE *>(const_cast<char *>(kDpapiEntropy))};
+    DATA_BLOB output{};
+    if (!CryptUnprotectData(
+            &input, nullptr, &entropy, nullptr, nullptr, CRYPTPROTECT_UI_FORBIDDEN, &output))
+        throw std::runtime_error("LICENSE_STORAGE_DECRYPT_FAILED");
+    std::unique_ptr<unsigned char, LocalMemoryDeleter> decrypted(output.pbData);
+    return std::string(reinterpret_cast<const char *>(output.pbData), output.cbData);
+}
+
+void writeStoredCache(const std::string &plainText)
+{
+    DATA_BLOB input{static_cast<DWORD>(plainText.size()),
+                    reinterpret_cast<BYTE *>(const_cast<char *>(plainText.data()))};
+    DATA_BLOB entropy{static_cast<DWORD>(sizeof(kDpapiEntropy) - 1),
+                      reinterpret_cast<BYTE *>(const_cast<char *>(kDpapiEntropy))};
+    DATA_BLOB output{};
+    if (!CryptProtectData(&input,
+                          L"ThimPOS License",
+                          &entropy,
+                          nullptr,
+                          nullptr,
+                          CRYPTPROTECT_UI_FORBIDDEN,
+                          &output))
+        throw std::runtime_error("LICENSE_STORAGE_WRITE_FAILED");
+    std::unique_ptr<unsigned char, LocalMemoryDeleter> encrypted(output.pbData);
+
+    HKEY key = nullptr;
+    if (RegCreateKeyExW(HKEY_CURRENT_USER,
+                        kRegistryPath,
+                        0,
+                        nullptr,
+                        0,
+                        KEY_SET_VALUE,
+                        nullptr,
+                        &key,
+                        nullptr) != ERROR_SUCCESS)
+        throw std::runtime_error("LICENSE_STORAGE_WRITE_FAILED");
+    std::unique_ptr<std::remove_pointer_t<HKEY>, decltype(&RegCloseKey)> registryKey(
+        key, RegCloseKey);
+    if (RegSetValueExW(registryKey.get(),
+                       kRegistryValue,
+                       0,
+                       REG_BINARY,
+                       output.pbData,
+                       output.cbData) != ERROR_SUCCESS)
+        throw std::runtime_error("LICENSE_STORAGE_WRITE_FAILED");
+}
+
+void deleteStoredCache()
+{
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, kRegistryPath, 0, KEY_SET_VALUE, &key) !=
+        ERROR_SUCCESS)
+        return;
+    std::unique_ptr<std::remove_pointer_t<HKEY>, decltype(&RegCloseKey)> registryKey(
+        key, RegCloseKey);
+    RegDeleteValueW(registryKey.get(), kRegistryValue);
+}
+#else
+std::filesystem::path cachePath()
+{
+    const auto *user = getpwuid(getuid());
+    if (!user || !user->pw_dir)
+        throw std::runtime_error("LICENSE_STORAGE_READ_FAILED");
+    return std::filesystem::path(user->pw_dir) / ".thimpos-license.json";
+}
+
+std::optional<std::string> readStoredCache()
+{
+    std::ifstream input(cachePath(), std::ios::binary);
     if (!input)
         return std::nullopt;
     std::ostringstream contents;
     contents << input.rdbuf();
-    auto root = parseJson(contents.str(), "license cache");
-    return Cache{root, root["key"].asString(), root["device_id"].asString()};
+    if (!input.good() && !input.eof())
+        throw std::runtime_error("LICENSE_STORAGE_READ_FAILED");
+    return contents.str();
 }
 
-void saveCache(const std::filesystem::path &path, const Json::Value &cache)
+void writeStoredCache(const std::string &plainText)
 {
+    const auto path = cachePath();
     const auto temporary = path.string() + ".tmp";
     {
         std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
         if (!output)
-            throw std::runtime_error("LICENSE_CACHE_WRITE_FAILED");
-        output << compactJson(cache);
+            throw std::runtime_error("LICENSE_STORAGE_WRITE_FAILED");
+        output << plainText;
         if (!output)
-            throw std::runtime_error("LICENSE_CACHE_WRITE_FAILED");
+            throw std::runtime_error("LICENSE_STORAGE_WRITE_FAILED");
     }
+    chmod(temporary.c_str(), S_IRUSR | S_IWUSR);
     std::error_code error;
-    std::filesystem::remove(path, error);
-    error.clear();
     std::filesystem::rename(temporary, path, error);
     if (error)
-        throw std::runtime_error("LICENSE_CACHE_WRITE_FAILED: " + error.message());
+    {
+        std::filesystem::remove(path, error);
+        error.clear();
+        std::filesystem::rename(temporary, path, error);
+    }
+    if (error)
+        throw std::runtime_error("LICENSE_STORAGE_WRITE_FAILED");
+}
+
+void deleteStoredCache()
+{
+    std::error_code error;
+    std::filesystem::remove(cachePath(), error);
+}
+#endif
+
+std::optional<Cache> loadCache()
+{
+    const auto stored = readStoredCache();
+    if (!stored)
+        return std::nullopt;
+    Json::Value root;
+    try
+    {
+        root = parseJson(*stored, "license cache");
+    }
+    catch (...)
+    {
+        throw std::runtime_error("LICENSE_CACHE_INVALID");
+    }
+    const auto key = trim(root["key"].asString());
+    const auto deviceId = trim(root["device_id"].asString());
+    if (key.empty() || deviceId.empty())
+        throw std::runtime_error("LICENSE_CACHE_INVALID");
+    return Cache{root, key, deviceId};
+}
+
+void saveCache(const Json::Value &cache)
+{
+    writeStoredCache(compactJson(cache));
+}
+
+std::string promptForKey(std::string_view prompt)
+{
+    std::cout << '\n' << prompt << "\nLicense key: " << std::flush;
+    std::string key;
+    if (!std::getline(std::cin, key) || trim(key).empty())
+        throw std::runtime_error("LICENSE_KEY_REQUIRED");
+    return trim(std::move(key));
 }
 
 std::string generateDeviceId()
@@ -356,40 +537,29 @@ std::string generateDeviceId()
 }  // namespace
 
 KeyManagerClient::KeyManagerClient()
-    : apiUrl_(environment("THIMPOS_KEY_MANAGER_URL")),
-      product_("thimpos"),
-      cachePath_(environment("THIMPOS_LICENSE_CACHE"))
+    : apiUrl_(kApiUrl), product_("thimpos")
 {
-    if (apiUrl_.empty())
-        apiUrl_ = "https://keymanager-cloud.thuanvatlyhy.workers.dev";
-    if (cachePath_.empty())
-        cachePath_ = ".thimpos-license.json";
 }
 
 VerifiedLicense KeyManagerClient::verifyAtStartup() const
 {
-    const auto requestedKey = environment("THIMPOS_LICENSE_KEY");
-    const auto requestedDeviceId = environment("THIMPOS_DEVICE_ID");
-    const auto cache = loadCache(cachePath_);
-
-    if (requestedKey.empty())
+    std::optional<Cache> cache;
+    try
     {
-        if (!cache)
-            throw std::runtime_error(
-                "LICENSE_KEY_REQUIRED (set THIMPOS_LICENSE_KEY for first activation)");
-        return verifySignedLicense(requireObject(cache->root, "license_file", "LICENSE_CACHE_INVALID"),
-                                   requireObject(cache->root, "public_key", "LICENSE_CACHE_INVALID"),
-                                   product_,
-                                   cache->key);
+        cache = loadCache();
+    }
+    catch (const std::exception &error)
+    {
+        std::cerr << "Cảnh báo bản quyền: " << formatLicenseError(error.what()) << '\n';
+        deleteStoredCache();
     }
 
-    const auto deviceId = !requestedDeviceId.empty()
-                              ? requestedDeviceId
-                              : (cache && !cache->deviceId.empty() ? cache->deviceId
-                                                                   : generateDeviceId());
-    const auto keyResponse = get(apiUrl_, "/v1/public-key");
-    if (!keyResponse.transportSucceeded)
-    {
+    std::string requestedKey =
+        cache ? cache->key
+              : promptForKey("ThimPOS chưa được kích hoạt. Vui lòng nhập key bản quyền được cấp.");
+    const auto deviceId = cache ? cache->deviceId : generateDeviceId();
+
+    const auto useOfflineCache = [&]() -> VerifiedLicense {
         if (cache && cache->key == requestedKey)
             return verifySignedLicense(
                 requireObject(cache->root, "license_file", "LICENSE_CACHE_INVALID"),
@@ -397,42 +567,95 @@ VerifiedLicense KeyManagerClient::verifyAtStartup() const
                 product_,
                 requestedKey);
         throw std::runtime_error("KEY_MANAGER_UNREACHABLE");
-    }
-    if (keyResponse.status < 200 || keyResponse.status >= 300)
-        throw std::runtime_error(apiError(keyResponse));
+    };
 
-    Json::Value activationBody;
-    activationBody["key"] = requestedKey;
-    activationBody["device_id"] = deviceId;
-    const auto activationResponse =
-        postJson(apiUrl_, "/v1/licenses/activate", activationBody);
-    if (!activationResponse.transportSucceeded)
+    while (true)
     {
-        if (cache && cache->key == requestedKey)
-            return verifySignedLicense(
-                requireObject(cache->root, "license_file", "LICENSE_CACHE_INVALID"),
-                requireObject(cache->root, "public_key", "LICENSE_CACHE_INVALID"),
-                product_,
-                requestedKey);
-        throw std::runtime_error("KEY_MANAGER_UNREACHABLE");
+        const auto keyResponse = get(apiUrl_, "/v1/public-key");
+        if (!keyResponse.transportSucceeded || keyResponse.status >= 500)
+            return useOfflineCache();
+        if (keyResponse.status < 200 || keyResponse.status >= 300)
+            throw std::runtime_error(apiError(keyResponse));
+
+        Json::Value activationBody;
+        activationBody["key"] = requestedKey;
+        activationBody["device_id"] = deviceId;
+        const auto activationResponse =
+            postJson(apiUrl_, "/v1/licenses/activate", activationBody);
+        if (!activationResponse.transportSucceeded || activationResponse.status >= 500)
+            return useOfflineCache();
+        if (activationResponse.status < 200 || activationResponse.status >= 300)
+        {
+            const auto error = apiError(activationResponse);
+            std::cerr << "\nKey không được chấp nhận: " << formatLicenseError(error) << '\n';
+            deleteStoredCache();
+            cache.reset();
+            requestedKey = promptForKey(
+                "Vui lòng nhập key bản quyền khác, hoặc để trống để thoát.");
+            continue;
+        }
+
+        const auto keyJson = parseJson(keyResponse.body, "public key response");
+        const auto activationJson = parseJson(activationResponse.body, "activation response");
+        const auto publicKey =
+            requireObject(keyJson, "public_key", "LICENSE_PUBLIC_KEY_INVALID");
+        const auto licenseFile =
+            requireObject(activationJson, "license_file", "LICENSE_ACTIVATION_INVALID");
+        const auto verified =
+            verifySignedLicense(licenseFile, publicKey, product_, requestedKey);
+
+        Json::Value newCache;
+        newCache["key"] = requestedKey;
+        newCache["device_id"] = deviceId;
+        newCache["session_id"] = activationJson["session_id"].asString();
+        newCache["public_key"] = publicKey;
+        newCache["license_file"] = licenseFile;
+        saveCache(newCache);
+        return verified;
     }
-    if (activationResponse.status < 200 || activationResponse.status >= 300)
-        throw std::runtime_error(apiError(activationResponse));
+}
 
-    const auto keyJson = parseJson(keyResponse.body, "public key response");
-    const auto activationJson = parseJson(activationResponse.body, "activation response");
-    const auto publicKey = requireObject(keyJson, "public_key", "LICENSE_PUBLIC_KEY_INVALID");
-    const auto licenseFile =
-        requireObject(activationJson, "license_file", "LICENSE_ACTIVATION_INVALID");
-    const auto verified = verifySignedLicense(licenseFile, publicKey, product_, requestedKey);
-
-    Json::Value newCache;
-    newCache["key"] = requestedKey;
-    newCache["device_id"] = deviceId;
-    newCache["session_id"] = activationJson["session_id"].asString();
-    newCache["public_key"] = publicKey;
-    newCache["license_file"] = licenseFile;
-    saveCache(cachePath_, newCache);
-    return verified;
+std::string formatLicenseError(std::string_view technicalError)
+{
+    const auto separator = technicalError.find_first_of(": (");
+    const std::string code(technicalError.substr(0, separator));
+    std::string message;
+    if (code == "LICENSE_KEY_REQUIRED")
+        message = "Chưa có key bản quyền. Hãy chạy lại và nhập key được cấp.";
+    else if (code == "LICENSE_NOT_FOUND")
+        message = "Key không tồn tại hoặc đã nhập sai.";
+    else if (code == "LICENSE_REVOKED")
+        message = "Key đã bị thu hồi. Vui lòng liên hệ nơi cấp bản quyền.";
+    else if (code == "LICENSE_NOT_STARTED")
+        message = "Bản quyền chưa đến ngày bắt đầu sử dụng.";
+    else if (code == "LICENSE_EXPIRED")
+        message = "Bản quyền đã hết hạn. Vui lòng gia hạn để tiếp tục sử dụng.";
+    else if (code == "LOGIN_LIMIT_REACHED")
+        message = "Key đã đạt giới hạn số lần kích hoạt.";
+    else if (code == "SESSION_LIMIT_REACHED")
+        message = "Key đã đạt giới hạn thiết bị hoặc phiên đang hoạt động.";
+    else if (code == "LICENSE_PRODUCT_MISMATCH")
+        message = "Key này không dành cho sản phẩm ThimPOS.";
+    else if (code == "OFFLINE_CACHE_EXPIRED")
+        message = "Thời gian sử dụng offline đã hết. Hãy kết nối Internet rồi mở lại ThimPOS.";
+    else if (code == "KEY_MANAGER_UNREACHABLE")
+        message = "Không thể kết nối máy chủ bản quyền và chưa có dữ liệu offline hợp lệ. Hãy kiểm tra Internet.";
+    else if (code == "LICENSE_SIGNATURE_INVALID" ||
+             code == "LICENSE_PUBLIC_KEY_INVALID" ||
+             code == "LICENSE_KEY_MISMATCH" || code == "LICENSE_CACHE_INVALID" ||
+             code == "UNSUPPORTED_LICENSE_FORMAT" ||
+             code == "OFFLINE_WINDOW_INVALID" || code == "LICENSE_BASE64_INVALID" ||
+             code == "LICENSE_TIME_INVALID")
+        message = "Dữ liệu bản quyền không hợp lệ hoặc đã bị thay đổi.";
+    else if (code == "LICENSE_STORAGE_READ_FAILED" ||
+             code == "LICENSE_STORAGE_DECRYPT_FAILED")
+        message = "Không đọc được dữ liệu bản quyền đã lưu trên máy. Hệ thống sẽ yêu cầu nhập lại key.";
+    else if (code == "LICENSE_STORAGE_WRITE_FAILED")
+        message = "Không thể lưu dữ liệu bản quyền trên máy. Hãy kiểm tra quyền của tài khoản đang chạy.";
+    else if (code == "DEVICE_ID_GENERATION_FAILED")
+        message = "Không thể tạo mã nhận diện thiết bị.";
+    else
+        message = "Không thể xác minh bản quyền. Vui lòng liên hệ hỗ trợ.";
+    return message + " [" + (code.empty() ? "LICENSE_ERROR" : code) + "]";
 }
 }  // namespace thimpos::license

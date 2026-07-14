@@ -1,7 +1,7 @@
 #pragma once
 
-#include <filesystem>
 #include <string>
+#include <string_view>
 
 namespace thimpos::license
 {
@@ -20,6 +20,7 @@ class KeyManagerClient
   private:
     std::string apiUrl_;
     std::string product_;
-    std::filesystem::path cachePath_;
 };
+
+std::string formatLicenseError(std::string_view technicalError);
 }  // namespace thimpos::license

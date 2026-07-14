@@ -559,7 +559,3 @@ FodyWeavers.xsd
 *.tlog
 
 # End of https://www.toptal.com/developers/gitignore/api/intellij+all,visualstudio,visualstudiocode,cmake,c,c++
-
-# Local signed license cache (contains the customer's key and session id)
-.thimpos-license.json
-.thimpos-license.json.tmp

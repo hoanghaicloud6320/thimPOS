@@ -1,29 +1,39 @@
 # Kiểm tra license khi khởi chạy
 
-ThimPOS mặc định kích hoạt key với KeyManager Cloud trước khi mở HTTP server. Client kiểm tra chữ ký ES256, product `thimpos`, trạng thái, ngày bắt đầu, ngày hết hạn và cửa sổ offline. License đã ký được lưu ở `.thimpos-license.json`; lần chạy sau có thể dùng cache offline đến `offline_until`.
+ThimPOS mặc định xác minh bản quyền trước khi mở HTTP server. Người dùng không cần thiết lập biến môi trường hoặc sửa file cấu hình.
 
-## Chạy lần đầu
+## Chạy và kích hoạt
 
-Linux/macOS:
+Khởi chạy ThimPOS như bình thường:
 
-```sh
-THIMPOS_LICENSE_KEY='<license-key>' ./ThimPOS
+```text
+ThimPOS chưa được kích hoạt. Vui lòng nhập key bản quyền được cấp.
+License key:
 ```
 
-PowerShell:
+Nhập key rồi nhấn Enter. Client sẽ kích hoạt thiết bị, kiểm tra chữ ký ES256, product `thimpos`, trạng thái, ngày bắt đầu, ngày hết hạn và cửa sổ offline. Sau khi thành công, các lần chạy sau tự sử dụng thông tin đã lưu.
 
-```powershell
-$env:THIMPOS_LICENSE_KEY = '<license-key>'
-./ThimPOS.exe
-```
+## Nơi lưu license
 
-Các biến tùy chọn:
+- **Windows:** dữ liệu được mã hóa bằng Windows DPAPI và lưu tại `HKEY_CURRENT_USER\Software\ThimPOS`. Dữ liệu gắn với tài khoản Windows hiện tại nên không thể chỉ copy sang máy hoặc tài khoản khác.
+- **Linux/macOS:** dữ liệu được lưu tại `~/.thimpos-license.json` với quyền file `0600`.
 
-- `THIMPOS_DEVICE_ID`: ID thiết bị ổn định do hệ thống triển khai cung cấp. Nếu bỏ trống, client tự tạo và giữ trong cache.
-- `THIMPOS_LICENSE_CACHE`: đổi đường dẫn cache license.
-- `THIMPOS_KEY_MANAGER_URL`: đổi API URL, chủ yếu phục vụ kiểm thử.
+Người dùng không cần truy cập hoặc chỉnh sửa dữ liệu này. Nếu dữ liệu bị thay đổi, ThimPOS sẽ từ chối và yêu cầu kích hoạt lại.
 
-Không commit key hoặc file cache. Khi KeyManager trả lỗi license (hết hạn, bị thu hồi, sai product hoặc hết giới hạn), server sẽ không khởi chạy. Cache chỉ được dùng thay thế khi không kết nối được API và bản license đã ký vẫn còn trong cửa sổ offline.
+## Thông báo lỗi bản quyền
+
+Thông báo luôn có mô tả tiếng Việt và mã lỗi để hỗ trợ tra cứu, ví dụ:
+
+- `LICENSE_NOT_FOUND`: key không tồn tại hoặc nhập sai.
+- `LICENSE_REVOKED`: key đã bị thu hồi.
+- `LICENSE_EXPIRED`: bản quyền đã hết hạn.
+- `LICENSE_PRODUCT_MISMATCH`: key không dành cho ThimPOS.
+- `LOGIN_LIMIT_REACHED`: đã đạt giới hạn số lần kích hoạt.
+- `SESSION_LIMIT_REACHED`: đã đạt giới hạn thiết bị hoặc phiên hoạt động.
+- `OFFLINE_CACHE_EXPIRED`: cần kết nối Internet để làm mới quyền sử dụng offline.
+- `KEY_MANAGER_UNREACHABLE`: không kết nối được máy chủ bản quyền và không có dữ liệu offline hợp lệ.
+
+Khi lỗi bản quyền chưa được xử lý, HTTP server sẽ không khởi chạy.
 
 ## Build nội bộ không kiểm tra key
 

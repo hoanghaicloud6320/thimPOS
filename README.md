@@ -36,7 +36,7 @@ cmake --build build -j 8
 Trên Linux/macOS cũng có thể dùng script có sẵn:
 
 ```sh
-./build.sh
+sh build.sh
 ```
 
 Chỉ với bản phát triển nội bộ, có thể build mà không kiểm tra license:
@@ -52,22 +52,23 @@ Binary này sẽ hiển thị cảnh báo khi khởi chạy.
 
 ThimPOS sử dụng các đường dẫn tương đối trong `config.json`, vì vậy hãy chạy binary từ thư mục gốc của dự án. Tạo thư mục log nếu chưa có.
 
+Không cần thiết lập biến môi trường hay sửa file cấu hình để nhập license. Ở lần chạy đầu tiên, ThimPOS sẽ tự yêu cầu nhập key trên màn hình.
+
 Linux/macOS:
 
 ```sh
 mkdir -p logs
-THIMPOS_LICENSE_KEY='<license-key>' ./build/ThimPOS
+./build/ThimPOS
 ```
 
 PowerShell:
 
 ```powershell
 New-Item -ItemType Directory -Force logs | Out-Null
-$env:THIMPOS_LICENSE_KEY = '<license-key>'
 ./build/ThimPOS.exe
 ```
 
-Sau lần kích hoạt thành công đầu tiên, client lưu license đã ký và device ID trong `.thimpos-license.json`. Server có thể dùng cache này khi mất kết nối đến KeyManager, miễn là cache vẫn còn hạn offline.
+Khi được hỏi, nhập key bản quyền đã được cấp rồi nhấn Enter. Sau lần kích hoạt thành công, các lần chạy tiếp theo sẽ tự kiểm tra và không yêu cầu nhập lại key. Server có thể dùng dữ liệu license đã ký khi mất kết nối đến KeyManager, miễn là thời gian sử dụng offline vẫn còn hiệu lực.
 
 Theo cấu hình mặc định, giao diện được phục vụ tại:
 
@@ -77,16 +78,12 @@ http://localhost/
 
 Server mặc định lắng nghe cổng `80`. Có thể thay đổi địa chỉ và cổng trong `config.json`.
 
-## Các biến môi trường license
+## Lưu trữ license
 
-| Biến | Mục đích |
-| --- | --- |
-| `THIMPOS_LICENSE_KEY` | Key dùng cho lần kích hoạt hoặc làm mới online |
-| `THIMPOS_DEVICE_ID` | Device ID ổn định do hệ thống triển khai cung cấp; nếu bỏ trống, ứng dụng tự tạo |
-| `THIMPOS_LICENSE_CACHE` | Thay đổi đường dẫn file cache license |
-| `THIMPOS_KEY_MANAGER_URL` | Thay đổi địa chỉ KeyManager, chủ yếu dùng khi kiểm thử |
+- Trên Windows, license được mã hóa bằng DPAPI và lưu trong Registry của tài khoản đang sử dụng. Dữ liệu không thể chỉ copy sang máy hoặc tài khoản Windows khác để dùng lại.
+- Trên Linux/macOS, license được lưu tại `~/.thimpos-license.json` với quyền chỉ chủ sở hữu đọc và ghi.
 
-Không commit license key hoặc `.thimpos-license.json` vào Git.
+Người dùng không cần tự tạo, tìm hoặc chỉnh sửa dữ liệu lưu này. Nếu key sai, hết hạn, bị thu hồi, sai sản phẩm hoặc đạt giới hạn kích hoạt, ThimPOS sẽ hiển thị thông báo bản quyền cụ thể và không khởi chạy server.
 
 ## Cấu trúc dự án
 
