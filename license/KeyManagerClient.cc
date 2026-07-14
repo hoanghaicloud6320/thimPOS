@@ -68,6 +68,11 @@ std::string trim(std::string value)
     return value.substr(first, last - first + 1);
 }
 
+std::string bilingual(std::string_view vietnamese, std::string_view english)
+{
+    return std::string(vietnamese) + " / " + std::string(english);
+}
+
 Json::Value parseJson(const std::string &text, std::string_view context)
 {
     Json::CharReaderBuilder builder;
@@ -550,13 +555,16 @@ VerifiedLicense KeyManagerClient::verifyAtStartup() const
     }
     catch (const std::exception &error)
     {
-        std::cerr << "Cảnh báo bản quyền: " << formatLicenseError(error.what()) << '\n';
+        std::cout << "Cảnh báo bản quyền / License warning: "
+                  << formatLicenseError(error.what()) << '\n';
         deleteStoredCache();
     }
 
     std::string requestedKey =
         cache ? cache->key
-              : promptForKey("ThimPOS chưa được kích hoạt. Vui lòng nhập key bản quyền được cấp.");
+              : promptForKey(
+                    "ThimPOS chưa được kích hoạt. Vui lòng nhập key bản quyền được cấp. / "
+                    "ThimPOS is not activated. Please enter your license key.");
     const auto deviceId = cache ? cache->deviceId : generateDeviceId();
 
     const auto useOfflineCache = [&]() -> VerifiedLicense {
@@ -587,11 +595,13 @@ VerifiedLicense KeyManagerClient::verifyAtStartup() const
         if (activationResponse.status < 200 || activationResponse.status >= 300)
         {
             const auto error = apiError(activationResponse);
-            std::cerr << "\nKey không được chấp nhận: " << formatLicenseError(error) << '\n';
+            std::cout << "\nKey không được chấp nhận / License key rejected: "
+                      << formatLicenseError(error) << '\n';
             deleteStoredCache();
             cache.reset();
             requestedKey = promptForKey(
-                "Vui lòng nhập key bản quyền khác, hoặc để trống để thoát.");
+                "Vui lòng nhập key bản quyền khác, hoặc để trống để thoát. / "
+                "Please enter another license key, or leave it blank to exit.");
             continue;
         }
 
@@ -621,41 +631,60 @@ std::string formatLicenseError(std::string_view technicalError)
     const std::string code(technicalError.substr(0, separator));
     std::string message;
     if (code == "LICENSE_KEY_REQUIRED")
-        message = "Chưa có key bản quyền. Hãy chạy lại và nhập key được cấp.";
+        message = bilingual("Chưa có key bản quyền. Hãy chạy lại và nhập key được cấp.",
+                            "No license key was provided. Run again and enter your key.");
     else if (code == "LICENSE_NOT_FOUND")
-        message = "Key không tồn tại hoặc đã nhập sai.";
+        message = bilingual("Key không tồn tại hoặc đã nhập sai.",
+                            "The license key does not exist or was entered incorrectly.");
     else if (code == "LICENSE_REVOKED")
-        message = "Key đã bị thu hồi. Vui lòng liên hệ nơi cấp bản quyền.";
+        message = bilingual("Key đã bị thu hồi. Vui lòng liên hệ nơi cấp bản quyền.",
+                            "The license key was revoked. Contact your license provider.");
     else if (code == "LICENSE_NOT_STARTED")
-        message = "Bản quyền chưa đến ngày bắt đầu sử dụng.";
+        message = bilingual("Bản quyền chưa đến ngày bắt đầu sử dụng.",
+                            "The license validity period has not started yet.");
     else if (code == "LICENSE_EXPIRED")
-        message = "Bản quyền đã hết hạn. Vui lòng gia hạn để tiếp tục sử dụng.";
+        message = bilingual("Bản quyền đã hết hạn. Vui lòng gia hạn để tiếp tục sử dụng.",
+                            "The license has expired. Renew it to continue.");
     else if (code == "LOGIN_LIMIT_REACHED")
-        message = "Key đã đạt giới hạn số lần kích hoạt.";
+        message = bilingual("Key đã đạt giới hạn số lần kích hoạt.",
+                            "The license has reached its activation limit.");
     else if (code == "SESSION_LIMIT_REACHED")
-        message = "Key đã đạt giới hạn thiết bị hoặc phiên đang hoạt động.";
+        message = bilingual("Key đã đạt giới hạn thiết bị hoặc phiên đang hoạt động.",
+                            "The license has reached its active device or session limit.");
     else if (code == "LICENSE_PRODUCT_MISMATCH")
-        message = "Key này không dành cho sản phẩm ThimPOS.";
+        message = bilingual("Key này không dành cho sản phẩm ThimPOS.",
+                            "This license key is not valid for ThimPOS.");
     else if (code == "OFFLINE_CACHE_EXPIRED")
-        message = "Thời gian sử dụng offline đã hết. Hãy kết nối Internet rồi mở lại ThimPOS.";
+        message = bilingual(
+            "Thời gian sử dụng offline đã hết. Hãy kết nối Internet rồi mở lại ThimPOS.",
+            "The offline period has expired. Connect to the Internet and restart ThimPOS.");
     else if (code == "KEY_MANAGER_UNREACHABLE")
-        message = "Không thể kết nối máy chủ bản quyền và chưa có dữ liệu offline hợp lệ. Hãy kiểm tra Internet.";
+        message = bilingual(
+            "Không thể kết nối máy chủ bản quyền và chưa có dữ liệu offline hợp lệ. Hãy kiểm tra Internet.",
+            "The license server is unreachable and no valid offline license is available. Check your Internet connection.");
     else if (code == "LICENSE_SIGNATURE_INVALID" ||
              code == "LICENSE_PUBLIC_KEY_INVALID" ||
              code == "LICENSE_KEY_MISMATCH" || code == "LICENSE_CACHE_INVALID" ||
              code == "UNSUPPORTED_LICENSE_FORMAT" ||
              code == "OFFLINE_WINDOW_INVALID" || code == "LICENSE_BASE64_INVALID" ||
              code == "LICENSE_TIME_INVALID")
-        message = "Dữ liệu bản quyền không hợp lệ hoặc đã bị thay đổi.";
+        message = bilingual("Dữ liệu bản quyền không hợp lệ hoặc đã bị thay đổi.",
+                            "The license data is invalid or has been modified.");
     else if (code == "LICENSE_STORAGE_READ_FAILED" ||
              code == "LICENSE_STORAGE_DECRYPT_FAILED")
-        message = "Không đọc được dữ liệu bản quyền đã lưu trên máy. Hệ thống sẽ yêu cầu nhập lại key.";
+        message = bilingual(
+            "Không đọc được dữ liệu bản quyền đã lưu trên máy. Hệ thống sẽ yêu cầu nhập lại key.",
+            "The saved license data cannot be read. You will be asked to enter the key again.");
     else if (code == "LICENSE_STORAGE_WRITE_FAILED")
-        message = "Không thể lưu dữ liệu bản quyền trên máy. Hãy kiểm tra quyền của tài khoản đang chạy.";
+        message = bilingual(
+            "Không thể lưu dữ liệu bản quyền trên máy. Hãy kiểm tra quyền của tài khoản đang chạy.",
+            "The license data cannot be saved. Check the current account permissions.");
     else if (code == "DEVICE_ID_GENERATION_FAILED")
-        message = "Không thể tạo mã nhận diện thiết bị.";
+        message = bilingual("Không thể tạo mã nhận diện thiết bị.",
+                            "A device identifier could not be generated.");
     else
-        message = "Không thể xác minh bản quyền. Vui lòng liên hệ hỗ trợ.";
+        message = bilingual("Không thể xác minh bản quyền. Vui lòng liên hệ hỗ trợ.",
+                            "The license could not be verified. Contact support.");
     return message + " [" + (code.empty() ? "LICENSE_ERROR" : code) + "]";
 }
 }  // namespace thimpos::license

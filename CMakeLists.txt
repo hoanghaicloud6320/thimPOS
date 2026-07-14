@@ -22,6 +22,14 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(${PROJECT_NAME} main.cc)
 
+if (MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE /utf-8)
+else ()
+    target_compile_options(${PROJECT_NAME} PRIVATE
+                           -finput-charset=UTF-8
+                           -fexec-charset=UTF-8)
+endif ()
+
 option(THIMPOS_IGNORE_KEY_CHECK
        "Build ThimPOS without the startup license-key check (development only)"
        OFF)
