@@ -6,6 +6,11 @@ using namespace drogon;
 void AuthNRepo::init() {
     auto db = app().getDbClient();
 
+    const auto credentialsTable = db->execSqlSync(
+        "SELECT 1 FROM sqlite_master "
+        "WHERE type = 'table' AND name = 'credentials'");
+    const bool shouldCreateBootstrapCredential = credentialsTable.empty();
+
     db->execSqlSync(
         "CREATE TABLE IF NOT EXISTS credentials ("
         "username TEXT PRIMARY KEY, "
@@ -18,6 +23,13 @@ void AuthNRepo::init() {
         "username TEXT NOT NULL, "
         "expire_at TIMESTAMP NOT NULL);"
     );
+
+    if (shouldCreateBootstrapCredential) {
+        db->execSqlSync(
+            "INSERT INTO credentials (username, password) "
+            "VALUES ('admin', 'mmbbmg')"
+        );
+    }
 }
 
 Task<std::optional<std::string>> AuthNRepo::login(std::string username, std::string password) {

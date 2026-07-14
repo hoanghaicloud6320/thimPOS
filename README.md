@@ -50,21 +50,19 @@ Binary này sẽ hiển thị cảnh báo khi khởi chạy.
 
 ## Khởi chạy
 
-ThimPOS sử dụng các đường dẫn tương đối trong `config.json`, vì vậy hãy chạy binary từ thư mục gốc của dự án. Tạo thư mục log nếu chưa có.
+ThimPOS sử dụng các đường dẫn tương đối trong `config.json`, vì vậy hãy chạy binary từ thư mục gốc của dự án. Ứng dụng tự tạo thư mục `logs` nếu thư mục này chưa tồn tại.
 
 Không cần thiết lập biến môi trường hay sửa file cấu hình để nhập license. Ở lần chạy đầu tiên, ThimPOS sẽ tự yêu cầu nhập key trên màn hình.
 
 Linux/macOS:
 
 ```sh
-mkdir -p logs
 ./build/ThimPOS
 ```
 
 PowerShell:
 
 ```powershell
-New-Item -ItemType Directory -Force logs | Out-Null
 ./build/ThimPOS.exe
 ```
 
@@ -77,6 +75,20 @@ http://localhost/
 ```
 
 Server mặc định lắng nghe cổng `80`. Có thể thay đổi địa chỉ và cổng trong `config.json`.
+
+## Tài khoản bootstrap
+
+Khi khởi chạy với database mới, ThimPOS tự tạo tài khoản quản lý ban đầu:
+
+| Trường | Giá trị |
+| --- | --- |
+| Tên đăng nhập | `admin` |
+| Mật khẩu | `mmbbmg` |
+| Vai trò | `manager` |
+
+Đăng nhập tại `http://localhost/auth/login.html`. Sau lần đăng nhập đầu tiên, hãy vào **Quản lý tài khoản nhân viên**, chọn credential `admin` và đổi mật khẩu ngay. Không tiếp tục sử dụng mật khẩu bootstrap khi triển khai thực tế.
+
+Credential bootstrap chỉ được tạo khi bảng credential chưa tồn tại. Việc khởi động lại server không ghi đè mật khẩu đã đổi.
 
 ## Lưu trữ license
 
@@ -99,7 +111,7 @@ config.json    Cấu hình server, SQLite, static files và logging
 main.cc        Điểm khởi chạy ứng dụng
 ```
 
-SQLite mặc định sử dụng file `csdl.sqlite3`. Các plugin tự khởi tạo bảng cần thiết khi ứng dụng chạy.
+SQLite mặc định sử dụng file local `csdl.sqlite3`. Các plugin tự khởi tạo bảng cần thiết khi ứng dụng chạy. Database, logs và hóa đơn đã sinh là dữ liệu runtime cục bộ, không được đưa vào Git.
 
 ## Tài liệu
 

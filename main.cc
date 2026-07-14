@@ -1,5 +1,6 @@
 #include <drogon/drogon.h>
 #include <cstdlib>
+#include <filesystem>
 #include <iostream>
 
 #ifdef _WIN32
@@ -19,6 +20,15 @@ int main()
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
 #endif
+
+    std::error_code logDirectoryError;
+    std::filesystem::create_directories("logs", logDirectoryError);
+    if (logDirectoryError)
+    {
+        std::cout << "Không thể tạo thư mục logs. / Unable to create the logs directory.\n";
+        std::cout << "Chi tiết / Details: " << logDirectoryError.message() << '\n';
+        return EXIT_FAILURE;
+    }
 
 #ifndef THIMPOS_IGNORE_KEY_CHECK
     try
