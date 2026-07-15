@@ -22,5 +22,6 @@ class KeyManagerClient
     std::string product_;
 };
 
+void clearLicenseCache();
 std::string formatLicenseError(std::string_view technicalError);
 }  // namespace thimpos::license

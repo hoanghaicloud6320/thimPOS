@@ -66,6 +66,14 @@ PowerShell:
 ./build/ThimPOS.exe
 ```
 
+Xóa cache license đã lưu và thoát mà không khởi động server:
+
+```sh
+./build/ThimPOS --clear-license-cache
+```
+
+Trên PowerShell, chạy `./build/ThimPOS.exe --clear-license-cache`.
+
 Khi được hỏi, nhập key bản quyền đã được cấp rồi nhấn Enter. Thông báo bản quyền trên terminal hiển thị song ngữ Việt–Anh; trên Windows, chương trình tự chuyển console sang UTF-8. Sau lần kích hoạt thành công, các lần chạy tiếp theo sẽ tự kiểm tra và không yêu cầu nhập lại key. Server có thể dùng dữ liệu license đã ký khi mất kết nối đến KeyManager, miễn là thời gian sử dụng offline vẫn còn hiệu lực.
 
 Theo cấu hình mặc định, giao diện được phục vụ tại:

@@ -15,6 +15,12 @@ Nhập key rồi nhấn Enter. Client sẽ kích hoạt thiết bị, kiểm tra
 
 ## Nơi lưu license
 
+Xóa cache license đã lưu và thoát mà không khởi động server:
+
+```sh
+./build/ThimPOS --clear-license-cache
+```
+
 - **Windows:** dữ liệu được mã hóa bằng Windows DPAPI và lưu tại `HKEY_CURRENT_USER\Software\ThimPOS`. Dữ liệu gắn với tài khoản Windows hiện tại nên không thể chỉ copy sang máy hoặc tài khoản khác.
 - **Linux/macOS:** dữ liệu được lưu tại `~/.thimpos-license.json` với quyền file `0600`.
 

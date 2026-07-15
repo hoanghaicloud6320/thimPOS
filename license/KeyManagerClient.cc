@@ -433,12 +433,17 @@ void writeStoredCache(const std::string &plainText)
 void deleteStoredCache()
 {
     HKEY key = nullptr;
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, kRegistryPath, 0, KEY_SET_VALUE, &key) !=
-        ERROR_SUCCESS)
+    const auto opened =
+        RegOpenKeyExW(HKEY_CURRENT_USER, kRegistryPath, 0, KEY_SET_VALUE, &key);
+    if (opened == ERROR_FILE_NOT_FOUND)
         return;
+    if (opened != ERROR_SUCCESS)
+        throw std::runtime_error("LICENSE_STORAGE_DELETE_FAILED");
     std::unique_ptr<std::remove_pointer_t<HKEY>, decltype(&RegCloseKey)> registryKey(
         key, RegCloseKey);
-    RegDeleteValueW(registryKey.get(), kRegistryValue);
+    const auto deleted = RegDeleteValueW(registryKey.get(), kRegistryValue);
+    if (deleted != ERROR_SUCCESS && deleted != ERROR_FILE_NOT_FOUND)
+        throw std::runtime_error("LICENSE_STORAGE_DELETE_FAILED");
 }
 #else
 std::filesystem::path cachePath()
@@ -490,6 +495,8 @@ void deleteStoredCache()
 {
     std::error_code error;
     std::filesystem::remove(cachePath(), error);
+    if (error)
+        throw std::runtime_error("LICENSE_STORAGE_DELETE_FAILED");
 }
 #endif
 
@@ -625,6 +632,11 @@ VerifiedLicense KeyManagerClient::verifyAtStartup() const
     }
 }
 
+void clearLicenseCache()
+{
+    deleteStoredCache();
+}
+
 std::string formatLicenseError(std::string_view technicalError)
 {
     const auto separator = technicalError.find_first_of(": (");
@@ -679,6 +691,10 @@ std::string formatLicenseError(std::string_view technicalError)
         message = bilingual(
             "Không thể lưu dữ liệu bản quyền trên máy. Hãy kiểm tra quyền của tài khoản đang chạy.",
             "The license data cannot be saved. Check the current account permissions.");
+    else if (code == "LICENSE_STORAGE_DELETE_FAILED")
+        message = bilingual(
+            "Không thể xóa dữ liệu bản quyền đã lưu. Hãy kiểm tra quyền của tài khoản đang chạy.",
+            "The saved license data cannot be deleted. Check the current account permissions.");
     else if (code == "DEVICE_ID_GENERATION_FAILED")
         message = bilingual("Không thể tạo mã nhận diện thiết bị.",
                             "A device identifier could not be generated.");

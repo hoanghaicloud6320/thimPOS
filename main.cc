@@ -1,5 +1,6 @@
 #include <drogon/drogon.h>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <iostream>
 
@@ -14,11 +15,36 @@
 #include "KeyManagerClient.h"
 #endif
 
-int main()
+int main(int argc, char *argv[])
 {
 #ifdef _WIN32
     SetConsoleOutputCP(CP_UTF8);
     SetConsoleCP(CP_UTF8);
+#endif
+
+#ifndef THIMPOS_IGNORE_KEY_CHECK
+    if (argc == 2 && std::strcmp(argv[1], "--clear-license-cache") == 0)
+    {
+        try
+        {
+            thimpos::license::clearLicenseCache();
+            std::cout << "Đã xóa cache bản quyền. / License cache cleared.\n";
+            return EXIT_SUCCESS;
+        }
+        catch (const std::exception &error)
+        {
+            std::cout << "Không thể xóa cache bản quyền. / Unable to clear license cache: "
+                      << thimpos::license::formatLicenseError(error.what()) << '\n';
+            return EXIT_FAILURE;
+        }
+    }
+#else
+    if (argc == 2 && std::strcmp(argv[1], "--clear-license-cache") == 0)
+    {
+        std::cerr << "Không thể xóa cache bản quyền từ bản build này. / "
+                     "License cache clearing is unavailable in this build.\n";
+        return EXIT_FAILURE;
+    }
 #endif
 
     std::error_code logDirectoryError;
