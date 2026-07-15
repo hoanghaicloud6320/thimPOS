@@ -57,7 +57,7 @@
             "filename":"csdl.sqlite3",
             //is_fast: false by default, if it is true, the client is faster but user can't call
             //any synchronous interface of it.
-            "is_fast": true,
+            "is_fast": false,
             //number_of_connections: 1 by default, if the 'is_fast' is true, the number is the number of  
             //connections per IO thread, otherwise it is the total number of all connections.  
             "number_of_connections": 1
