@@ -3,6 +3,12 @@
 #include <cstring>
 #include <filesystem>
 #include <iostream>
+#include <memory>
+#include <vector>
+
+#include <spdlog/logger.h>
+#include <spdlog/sinks/rotating_file_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -14,6 +20,31 @@
 #ifndef THIMPOS_IGNORE_KEY_CHECK
 #include "KeyManagerClient.h"
 #endif
+
+namespace
+{
+constexpr std::size_t kLogFileSize = 5 * 1024 * 1024;
+constexpr std::size_t kRotatedLogFiles = 4;
+
+std::shared_ptr<spdlog::logger> configureLogger()
+{
+    std::vector<spdlog::sink_ptr> sinks;
+    sinks.emplace_back(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
+    sinks.emplace_back(std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
+        "logs/app-recorder.log",
+        kLogFileSize,
+        kRotatedLogFiles,
+        false));
+
+    auto logger = std::make_shared<spdlog::logger>(
+        "thimpos", sinks.begin(), sinks.end());
+    logger->set_pattern("%Y%m%d %T.%f %6t %^%=8l%$ [%!] %v - %s:%#");
+    logger->set_level(spdlog::level::trace);
+    logger->flush_on(spdlog::level::info);
+    trantor::Logger::enableSpdLog(logger);
+    return logger;
+}
+}  // namespace
 
 int main(int argc, char *argv[])
 {
@@ -75,10 +106,18 @@ int main(int argc, char *argv[])
     std::cerr << "WARNING: license-key verification is disabled in this build\n";
 #endif
 
-    //Load config file
+    // Load config first, then install a dual-sink logger before Drogon starts
+    // plugins. Drogon keeps this logger instead of replacing it with a
+    // file-only sink in setupFileLogger().
     drogon::app().loadConfigFile("config.json");
-    //Run HTTP framework,the method will block in the internal event loop
+    auto logger = configureLogger();
+
+    // Run HTTP framework; this blocks in the internal event loop.
     drogon::app().run();
+
+    // TerminateProcess() below bypasses static and DLL destructors, so flush
+    // explicitly after plugin shutdown messages have been emitted.
+    logger->flush();
 
 #ifdef _WIN32
     // Drogon/Trantor's AsyncFileLogger destructor can deadlock while MinGW
