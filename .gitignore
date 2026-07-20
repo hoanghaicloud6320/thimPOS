@@ -565,3 +565,11 @@ FodyWeavers.xsd
 /logs/
 /local-data/
 /bills/bill_*.txt
+
+# ThimPOS local build and functional-test artifacts
+/build-release*/
+/dist/
+/api-functional-test.mjs
+/api-functional-test-result.json
+/print-functional-test.mjs
+/print-functional-test-result.json

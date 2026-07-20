@@ -26,6 +26,83 @@ namespace
 constexpr std::size_t kLogFileSize = 5 * 1024 * 1024;
 constexpr std::size_t kRotatedLogFiles = 4;
 
+std::string auditValue(std::string value)
+{
+    constexpr std::size_t kMaxAuditValueLength = 256;
+    if (value.size() > kMaxAuditValueLength)
+    {
+        value.resize(kMaxAuditValueLength);
+    }
+
+    for (auto &character : value)
+    {
+        if (character == '\r' || character == '\n' ||
+            character == '\t')
+        {
+            character = ' ';
+        }
+    }
+    return value;
+}
+
+std::string auditAttribute(const drogon::HttpRequestPtr &request,
+                           const std::string &name,
+                           const std::string &fallback)
+{
+    try
+    {
+        const auto value =
+            request->attributes()->get<std::string>(name);
+        return value.empty() ? fallback : auditValue(value);
+    }
+    catch (...)
+    {
+        return fallback;
+    }
+}
+
+std::string auditTarget(const drogon::HttpRequestPtr &request)
+{
+    const auto &path = request->path();
+    if (path != "/auth/login" && path != "/auth/register")
+    {
+        return "-";
+    }
+
+    const auto json = request->getJsonObject();
+    if (!json || !json->isMember("username") ||
+        !(*json)["username"].isString())
+    {
+        return "-";
+    }
+
+    // Only the claimed username is useful for these anonymous actions.
+    // Never write passwords, cookies, session tokens, or the request body.
+    return auditValue((*json)["username"].asString());
+}
+
+void registerAuditLogger()
+{
+    drogon::app().registerPostHandlingAdvice(
+        [](const drogon::HttpRequestPtr &request,
+           const drogon::HttpResponsePtr &response) {
+            const auto actor =
+                auditAttribute(request, "username", "anonymous");
+            const auto role =
+                auditAttribute(request, "role", "anonymous");
+
+            LOG_INFO << "[AUDIT]"
+                     << " actor=" << actor
+                     << " role=" << role
+                     << " method=" << request->methodString()
+                     << " path=" << auditValue(request->path())
+                     << " status="
+                     << static_cast<int>(response->statusCode())
+                     << " ip=" << request->peerAddr().toIp()
+                     << " target=" << auditTarget(request);
+        });
+}
+
 std::shared_ptr<spdlog::logger> configureLogger()
 {
     std::vector<spdlog::sink_ptr> sinks;
@@ -111,6 +188,7 @@ int main(int argc, char *argv[])
     // file-only sink in setupFileLogger().
     drogon::app().loadConfigFile("config.json");
     auto logger = configureLogger();
+    registerAuditLogger();
 
     // Run HTTP framework; this blocks in the internal event loop.
     drogon::app().run();
