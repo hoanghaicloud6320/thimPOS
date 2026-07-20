@@ -1,9 +1,14 @@
 #include <drogon/drogon.h>
+#include "AuditLog.h"
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <filesystem>
+#include <iomanip>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <vector>
 
 #include <spdlog/logger.h>
@@ -81,26 +86,198 @@ std::string auditTarget(const drogon::HttpRequestPtr &request)
     return auditValue((*json)["username"].asString());
 }
 
+std::string auditJsonString(const drogon::HttpRequestPtr &request,
+                            const std::string &field)
+{
+    const auto json = request->getJsonObject();
+    if (!json || !json->isMember(field) || !(*json)[field].isString())
+    {
+        return "";
+    }
+    return auditValue((*json)[field].asString());
+}
+
+bool startsWith(const std::string &value, const std::string &prefix)
+{
+    return value.compare(0, prefix.size(), prefix) == 0;
+}
+
+std::string auditActor(const drogon::HttpRequestPtr &request)
+{
+    const auto username =
+        auditAttribute(request, "username", "");
+    if (username.empty())
+    {
+        return "Khách";
+    }
+
+    const auto role = auditAttribute(request, "role", "");
+    if (role == "manager")
+    {
+        return username + " (quản lý)";
+    }
+    if (role == "staff")
+    {
+        return username + " (nhân viên)";
+    }
+    return username;
+}
+
+std::string auditAction(const drogon::HttpRequestPtr &request)
+{
+    const auto &path = request->path();
+    const auto method = request->method();
+    const auto target = auditTarget(request);
+
+    if (path == "/auth/login")
+        return "đăng nhập với tên " + target;
+    if (path == "/auth/register")
+        return "đăng ký tài khoản " + target;
+    if (path == "/auth/logout")
+        return "đăng xuất";
+    if (path == "/auth/logout_all")
+        return "đăng xuất khỏi mọi thiết bị";
+    if (path == "/auth/change_password")
+    {
+        const auto username = auditJsonString(request, "username");
+        return "đổi mật khẩu tài khoản" +
+               (username.empty() ? "" : " " + username);
+    }
+    if (path == "/auth/me")
+        return "xem trạng thái đăng nhập";
+    if (path == "/auth/sessions")
+        return "xem các phiên đăng nhập";
+    if (startsWith(path, "/auth/sessions/"))
+        return "xóa một phiên đăng nhập";
+    if (path == "/auth/users")
+        return "xem danh sách tài khoản đăng nhập";
+    if (startsWith(path, "/auth/users/"))
+        return "xóa thông tin đăng nhập của " +
+               auditValue(path.substr(std::string("/auth/users/").size()));
+
+    if (path == "/api/printbill")
+    {
+        const auto id = auditValue(request->getParameter("id"));
+        return "in hóa đơn" + (id.empty() ? "" : " số " + id);
+    }
+
+    if (path == "/api/accounts" && method == drogon::Get)
+        return "xem danh sách tài khoản";
+    if (path == "/api/accounts" && method == drogon::Post)
+    {
+        const auto username = auditJsonString(request, "username");
+        return "tạo tài khoản" +
+               (username.empty() ? "" : " " + username);
+    }
+    if (startsWith(path, "/api/accounts/"))
+    {
+        const auto username =
+            auditValue(path.substr(std::string("/api/accounts/").size()));
+        if (method == drogon::Get)
+            return "xem tài khoản " + username;
+        if (method == drogon::Put)
+            return "sửa tài khoản " + username;
+        if (method == drogon::Delete)
+            return "xóa tài khoản " + username;
+    }
+    if (path == "/api/me" && method == drogon::Get)
+        return "xem hồ sơ cá nhân";
+    if (path == "/api/me" && method == drogon::Put)
+        return "sửa hồ sơ cá nhân";
+
+    if (path == "/api/products" && method == drogon::Get)
+        return "xem danh sách sản phẩm";
+    if (path == "/api/products" && method == drogon::Post)
+    {
+        const auto name = auditJsonString(request, "name");
+        return "thêm sản phẩm" +
+               (name.empty() ? "" : " “" + name + "”");
+    }
+    if (startsWith(path, "/api/products/search"))
+        return "tìm kiếm sản phẩm";
+    if (startsWith(path, "/api/products/"))
+    {
+        const auto id =
+            auditValue(path.substr(std::string("/api/products/").size()));
+        if (method == drogon::Get)
+            return "xem sản phẩm số " + id;
+        if (method == drogon::Put)
+            return "sửa sản phẩm số " + id;
+        if (method == drogon::Delete)
+            return "xóa sản phẩm số " + id;
+    }
+
+    if (path == "/api/orders" && method == drogon::Get)
+        return "xem danh sách đơn hàng";
+    if (path == "/api/orders" && method == drogon::Post)
+        return "tạo đơn hàng";
+    if (startsWith(path, "/api/orders/"))
+    {
+        const auto id =
+            auditValue(path.substr(std::string("/api/orders/").size()));
+        if (method == drogon::Get)
+            return "xem đơn hàng số " + id;
+        if (method == drogon::Put)
+            return "sửa đơn hàng số " + id;
+        if (method == drogon::Delete)
+            return "xóa đơn hàng số " + id;
+    }
+
+    return "truy cập " + auditValue(path);
+}
+
+std::string auditResult(drogon::HttpStatusCode status)
+{
+    const auto code = static_cast<int>(status);
+    if (code >= 200 && code < 400)
+        return "thành công";
+    if (code == 401)
+        return "chưa đăng nhập";
+    if (code == 403)
+        return "không đủ quyền";
+    if (code == 404)
+        return "không tìm thấy";
+    return "không thành công";
+}
+
 void registerAuditLogger()
 {
     drogon::app().registerPostHandlingAdvice(
         [](const drogon::HttpRequestPtr &request,
            const drogon::HttpResponsePtr &response) {
-            const auto actor =
-                auditAttribute(request, "username", "anonymous");
-            const auto role =
-                auditAttribute(request, "role", "anonymous");
+            const auto &path = request->path();
+            if (!startsWith(path, "/api/") &&
+                !startsWith(path, "/auth/"))
+            {
+                return;
+            }
 
-            LOG_INFO << "[AUDIT]"
-                     << " actor=" << actor
-                     << " role=" << role
-                     << " method=" << request->methodString()
-                     << " path=" << auditValue(request->path())
-                     << " status="
-                     << static_cast<int>(response->statusCode())
-                     << " ip=" << request->peerAddr().toIp()
-                     << " target=" << auditTarget(request);
+            writeAuditLog(
+                auditActor(request) + " " +
+                auditAction(request) + " — " +
+                auditResult(response->statusCode()) + ".");
         });
+}
+
+std::string newLogFilePath()
+{
+    const auto now = std::chrono::system_clock::now();
+    const auto time = std::chrono::system_clock::to_time_t(now);
+    std::tm localTime{};
+#ifdef _WIN32
+    localtime_s(&localTime, &time);
+#else
+    localtime_r(&time, &localTime);
+#endif
+
+    std::ostringstream path;
+    path << "logs/app-recorder-"
+         << std::put_time(&localTime, "%Y%m%d-%H%M%S")
+#ifdef _WIN32
+         << "-" << GetCurrentProcessId()
+#endif
+         << ".log";
+    return path.str();
 }
 
 std::shared_ptr<spdlog::logger> configureLogger()
@@ -108,16 +285,24 @@ std::shared_ptr<spdlog::logger> configureLogger()
     std::vector<spdlog::sink_ptr> sinks;
     sinks.emplace_back(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
     sinks.emplace_back(std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-        "logs/app-recorder.log",
+        newLogFilePath(),
         kLogFileSize,
         kRotatedLogFiles,
         false));
 
     auto logger = std::make_shared<spdlog::logger>(
         "thimpos", sinks.begin(), sinks.end());
-    logger->set_pattern("%Y%m%d %T.%f %6t %^%=8l%$ [%!] %v - %s:%#");
     logger->set_level(spdlog::level::trace);
     logger->flush_on(spdlog::level::info);
+
+    auto auditLogger = std::make_shared<spdlog::logger>(
+        "audit", sinks.begin(), sinks.end());
+    auditLogger->set_pattern("%Y-%m-%d %H:%M:%S | %v");
+    auditLogger->set_level(spdlog::level::info);
+    auditLogger->flush_on(spdlog::level::info);
+
+    spdlog::register_logger(logger);
+    spdlog::register_logger(auditLogger);
     trantor::Logger::enableSpdLog(logger);
     return logger;
 }
@@ -188,14 +373,25 @@ int main(int argc, char *argv[])
     // file-only sink in setupFileLogger().
     drogon::app().loadConfigFile("config.json");
     auto logger = configureLogger();
+    drogon::app().registerBeginningAdvice([] {
+        const auto auditLogger = spdlog::get("audit");
+        if (auditLogger)
+        {
+            auditLogger->set_pattern("%Y-%m-%d %H:%M:%S | %v");
+        }
+    });
     registerAuditLogger();
 
     // Run HTTP framework; this blocks in the internal event loop.
     drogon::app().run();
 
-    // TerminateProcess() below bypasses static and DLL destructors, so flush
-    // explicitly after plugin shutdown messages have been emitted.
+    // Close the log file while normal code is still running. Do not leave the
+    // file handle for the DLL/static destructor phase on Windows.
     logger->flush();
+    trantor::Logger::disableSpdLog();
+    spdlog::drop("audit");
+    spdlog::drop("thimpos");
+    logger.reset();
 
 #ifdef _WIN32
     // Drogon/Trantor's AsyncFileLogger destructor can deadlock while MinGW
