@@ -1,5 +1,6 @@
 #include <drogon/drogon.h>
 #include "AuditLog.h"
+#include "plugins/AiService.h"
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
@@ -357,6 +358,7 @@ int main(int argc, char *argv[])
     {
         thimpos::license::KeyManagerClient verifier;
         const auto license = verifier.verifyAtStartup();
+        AiService::configureFromLicense(license.metadata);
         std::cout << "Bản quyền hợp lệ / License valid: " << license.registrantName
                   << " (hết hạn / expires " << license.expiresAt << ")\n";
     }
@@ -369,6 +371,7 @@ int main(int argc, char *argv[])
     }
 #else
     std::cerr << "WARNING: license-key verification is disabled in this build\n";
+    AiService::configureFromLicense({});
 #endif
 
     // Load config first, then install a dual-sink logger before Drogon starts

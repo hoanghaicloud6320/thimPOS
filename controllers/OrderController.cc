@@ -43,6 +43,20 @@ static Json::Value orderListToJson(const std::vector<OrderDTO>& orders) {
         item["id"] = (Json::Int64)order.id;
         item["total_price"] = (Json::Int64)order.total_price;
         item["created_at"] = (Json::Int64)order.created_at;
+        item["updated_at"] = (Json::Int64)order.updated_at;
+        if (!order.items.empty()) {
+            Json::Value details(Json::arrayValue);
+            for (const auto& line : order.items) {
+                Json::Value row;
+                row["product_id"] = Json::Int64(line.product_id);
+                row["product_name"] = line.product_name;
+                row["quantity"] = line.quantity;
+                row["unit_price"] = Json::Int64(line.unit_price);
+                row["line_total"] = Json::Int64(line.line_total);
+                details.append(row);
+            }
+            item["items"] = details;
+        }
         ret.append(item);
     }
     return ret;
@@ -147,22 +161,38 @@ drogon::Task<drogon::HttpResponsePtr> OrderController::listOrders(drogon::HttpRe
         co_return resp;
     }
 
-    auto limitParam = req->getParameter("limit");
-    auto offsetParam = req->getParameter("offset");
-    int limit = limitParam.empty() ? 20 : std::stoi(limitParam);
-    int offset = offsetParam.empty() ? 0 : std::stoi(offsetParam);
-
     try {
-        auto orders = co_await service_->listOrders(limit, offset);
+        const auto limitParam = req->getParameter("limit");
+        const auto offsetParam = req->getParameter("offset");
+        const int limit = limitParam.empty() ? 20 : std::stoi(limitParam);
+        const int offset = offsetParam.empty() ? 0 : std::stoi(offsetParam);
+        if (limit < 1 || limit > 500 || offset < 0)
+            throw std::invalid_argument("limit must be 1..500 and offset must be non-negative");
+        std::optional<int64_t> from, to;
+        if (!req->getParameter("from").empty()) from = std::stoll(req->getParameter("from"));
+        if (!req->getParameter("to").empty()) to = std::stoll(req->getParameter("to"));
+        if (from && to && *from > *to)
+            throw std::invalid_argument("from must not be after to");
+        const bool includeItems = req->getParameter("include_items") == "true";
+        auto orders = co_await service_->listOrders(limit, offset, from, to, includeItems);
 
         Json::Value ret;
         ret["items"] = orderListToJson(orders);
         ret["limit"] = limit;
         ret["offset"] = offset;
+        if (from) ret["from"] = Json::Int64(*from);
+        if (to) ret["to"] = Json::Int64(*to);
+        ret["include_items"] = includeItems;
 
         co_return drogon::HttpResponse::newHttpJsonResponse(ret);
-    } catch (...) {
-        auto resp = drogon::HttpResponse::newHttpResponse();
+    } catch (const std::invalid_argument& error) {
+        Json::Value body; body["error"] = "INVALID_QUERY"; body["message"] = error.what();
+        auto resp = drogon::HttpResponse::newHttpJsonResponse(body);
+        resp->setStatusCode(drogon::k400BadRequest);
+        co_return resp;
+    } catch (const std::exception& error) {
+        Json::Value body; body["error"] = "INTERNAL_ERROR"; body["message"] = error.what();
+        auto resp = drogon::HttpResponse::newHttpJsonResponse(body);
         resp->setStatusCode(drogon::k500InternalServerError);
         co_return resp;
     }

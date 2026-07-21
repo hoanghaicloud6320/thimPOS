@@ -1,0 +1,3 @@
+[submodule "gem-copilot"]
+	path = gem-copilot
+	url = https://github.com/dominhnanhh2009/gem-copilot.git

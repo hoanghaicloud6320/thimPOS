@@ -331,6 +331,9 @@
         },
         {
             "name":"AuthNService"
+        },
+        {
+            "name":"AiService"
         }
     ],
     //custom_config: custom configuration for users. This object can be get by the app().getCustomConfig() method. 

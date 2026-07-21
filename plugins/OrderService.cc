@@ -125,9 +125,11 @@ drogon::Task<std::optional<OrderDTO>> OrderService::getOrder(int64_t id)
     co_return dto;
 }
 
-drogon::Task<std::vector<OrderDTO>> OrderService::listOrders(int limit, int offset)
+drogon::Task<std::vector<OrderDTO>> OrderService::listOrders(
+    int limit, int offset, std::optional<int64_t> from,
+    std::optional<int64_t> to, bool includeItems)
 {
-    auto orders = co_await repo_.listOrders(limit, offset);
+    auto orders = co_await repo_.listOrders(limit, offset, from, to);
     std::vector<OrderDTO> dtos;
     
     for (const auto& o : orders) {
@@ -136,6 +138,11 @@ drogon::Task<std::vector<OrderDTO>> OrderService::listOrders(int limit, int offs
         dto.total_price = o.total_price;
         dto.created_at = o.created_at;
         dto.updated_at = o.updated_at;
+        if (includeItems)
+        {
+            auto full = co_await getOrder(o.id);
+            if (full) dto.items = std::move(full->items);
+        }
         dtos.push_back(dto);
     }
     

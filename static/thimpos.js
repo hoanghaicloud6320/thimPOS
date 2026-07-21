@@ -5,7 +5,8 @@
             items: [
                 { label: "Sản phẩm", href: "/manager/products.html" },
                 { label: "Quản lý kho", href: "/manager/inventory.html" },
-                { label: "Báo cáo bán hàng", href: "/manager/sale-report.html" },
+                { label: "Báo cáo AI", href: "/manager/report.html" },
+                { label: "Chat với AI", href: "/manager/chat.html" },
                 { label: "Tài khoản nhân viên", href: "/manager/accounts.html" }
             ]
         },

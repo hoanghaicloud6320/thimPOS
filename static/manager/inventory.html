@@ -147,15 +147,18 @@ $('recipeDialog').addEventListener('click', event => { if (event.target === $('r
 
 async function load() {
   const [items, lots, recipes, productResult] = await Promise.all([
-    req(api + '/items'), req(api + '/lots'), req(api + '/recipes'), req('/api/products?limit=100&active_only=true')
+    req(api + '/items?limit=500'), req(api + '/lots?limit=500'), req(api + '/recipes?limit=500'), req('/api/products?limit=500&active_only=true')
   ]);
   if (!items || !lots || !recipes || !productResult) return;
   products = productResult.data || [];
-  inventoryItems = items;
-  $('items').innerHTML = items.length ? items.map(item => `<tr class="${item.is_active?'':'muted'}"><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.unit)}</td><td class="${item.on_hand<0?'bad':''}">${item.on_hand}</td><td><button class="btn-muted" onclick="toggleItem(${item.id},decodeURIComponent('${encodeArg(item.name)}'),decodeURIComponent('${encodeArg(item.unit)}'),${!item.is_active})">${item.is_active?'Ẩn':'Mở'}</button></td></tr>`).join('') : emptyRow(4, 'Chưa có nguyên liệu');
-  $('litem').innerHTML = items.filter(item => item.is_active).map(item => `<option value="${item.id}">${escapeHtml(item.name)} (${escapeHtml(item.unit)})</option>`).join('');
-  $('lots').innerHTML = lots.length ? lots.map(lot => `<tr class="${lot.is_void?'muted':''}"><td>${escapeHtml(lot.item_name)}</td><td>${lot.quantity}</td><td>${lot.remaining}</td><td>${Number(lot.unit_cost).toLocaleString('vi-VN')}</td><td>${date(lot.purchased_at)}</td><td class="${lot.expires_at && lot.expires_at<Date.now()/1000?'bad':''}">${date(lot.expires_at)}</td><td>${lot.is_void?'Đã hủy':`<button class="btn-danger" onclick="voidLot(${lot.id})">Hủy lô</button>`}</td></tr>`).join('') : emptyRow(7, 'Chưa có lô nhập');
-  $('recipes').innerHTML = renderRecipeGroups(recipes);
+  const itemRows = items.items || [];
+  const lotRows = lots.items || [];
+  const recipeRows = recipes.items || [];
+  inventoryItems = itemRows;
+  $('items').innerHTML = itemRows.length ? itemRows.map(item => `<tr class="${item.is_active?'':'muted'}"><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.unit)}</td><td class="${item.on_hand<0?'bad':''}">${item.on_hand}</td><td><button class="btn-muted" onclick="toggleItem(${item.id},decodeURIComponent('${encodeArg(item.name)}'),decodeURIComponent('${encodeArg(item.unit)}'),${!item.is_active})">${item.is_active?'Ẩn':'Mở'}</button></td></tr>`).join('') : emptyRow(4, 'Chưa có nguyên liệu');
+  $('litem').innerHTML = itemRows.filter(item => item.is_active).map(item => `<option value="${item.id}">${escapeHtml(item.name)} (${escapeHtml(item.unit)})</option>`).join('');
+  $('lots').innerHTML = lotRows.length ? lotRows.map(lot => `<tr class="${lot.is_void?'muted':''}"><td>${escapeHtml(lot.item_name)}</td><td>${lot.quantity}</td><td>${lot.remaining}</td><td>${Number(lot.unit_cost).toLocaleString('vi-VN')}</td><td>${date(lot.purchased_at)}</td><td class="${lot.expires_at && lot.expires_at<Date.now()/1000?'bad':''}">${date(lot.expires_at)}</td><td>${lot.is_void?'Đã hủy':`<button class="btn-danger" onclick="voidLot(${lot.id})">Hủy lô</button>`}</td></tr>`).join('') : emptyRow(7, 'Chưa có lô nhập');
+  $('recipes').innerHTML = renderRecipeGroups(recipeRows);
 }
 
 async function addItem() {

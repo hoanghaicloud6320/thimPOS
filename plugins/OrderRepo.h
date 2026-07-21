@@ -61,7 +61,9 @@ public:
     // =========================
     drogon::Task<int64_t> createOrder(int64_t total_price); // Thêm tham số
     drogon::Task<std::optional<Order>> getOrder(int64_t id);
-    drogon::Task<std::vector<Order>> listOrders(int limit, int offset);
+    drogon::Task<std::vector<Order>> listOrders(int limit, int offset,
+                                                std::optional<int64_t> from,
+                                                std::optional<int64_t> to);
     drogon::Task<bool> deleteOrder(int64_t id);
     drogon::Task<void> updateOrderTotal(int64_t id, int64_t total_price); // Thêm method này
 
