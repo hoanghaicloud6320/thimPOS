@@ -1,4 +1,5 @@
 #include "OrderController.h"
+#include "../AuditLog.h"
 
 // --- STATIC HELPER FUNCTIONS ---
 
@@ -45,6 +46,18 @@ static Json::Value orderListToJson(const std::vector<OrderDTO>& orders) {
         ret.append(item);
     }
     return ret;
+}
+
+static Json::Value editableOrderJson(const OrderDTO& order) {
+    Json::Value root, items(Json::arrayValue);
+    for (const auto& item : order.items) {
+        Json::Value row;
+        row["product_id"] = Json::Int64(item.product_id);
+        row["quantity"] = item.quantity;
+        items.append(row);
+    }
+    root["items"] = items;
+    return root;
 }
 
 static bool isAuthorized(const drogon::HttpRequestPtr& req) {
@@ -174,7 +187,11 @@ drogon::Task<drogon::HttpResponsePtr> OrderController::replaceOrder(drogon::Http
 
     try {
         auto items = toOrderItemInputs((*json)["items"]);
+        auto previous = co_await service_->getOrder(id);
         auto order = co_await service_->replaceOrder(id, items);
+        if (previous)
+            writeChangeAudit(req, "SỬA ĐƠN HÀNG", "order#" + std::to_string(id),
+                             editableOrderJson(*previous), editableOrderJson(order), {"items"});
         co_return drogon::HttpResponse::newHttpJsonResponse(orderToJson(order));
     } catch (const std::exception& e) {
         Json::Value err;
@@ -193,10 +210,14 @@ drogon::Task<drogon::HttpResponsePtr> OrderController::deleteOrder(drogon::HttpR
         co_return resp;
     }
 
+    auto previous = co_await service_->getOrder(id);
     bool success = co_await service_->deleteOrder(id);
     if (success) {
         Json::Value ret;
         ret["success"] = true;
+        if (previous)
+            writeChangeAudit(req, "XÓA ĐƠN HÀNG", "order#" + std::to_string(id),
+                             editableOrderJson(*previous), Json::Value(Json::objectValue), {"items"});
         co_return drogon::HttpResponse::newHttpJsonResponse(ret);
     }
     

@@ -240,6 +240,8 @@ std::string auditResult(drogon::HttpStatusCode status)
     return "không thành công";
 }
 
+// Audit request/view cũ được giữ lại để tham khảo nhưng không biên dịch.
+#if 0
 void registerAuditLogger()
 {
     drogon::app().registerPostHandlingAdvice(
@@ -258,6 +260,7 @@ void registerAuditLogger()
                 auditResult(response->statusCode()) + ".");
         });
 }
+#endif
 
 std::string newLogFilePath()
 {
@@ -380,7 +383,9 @@ int main(int argc, char *argv[])
             auditLogger->set_pattern("%Y-%m-%d %H:%M:%S | %v");
         }
     });
-    registerAuditLogger();
+    // Không audit request xem/list/search. Các controller chỉ ghi thao tác
+    // sửa/xóa thành công, kèm diff field mà người dùng có thể chỉnh.
+    // registerAuditLogger();
 
     // Run HTTP framework; this blocks in the internal event loop.
     drogon::app().run();

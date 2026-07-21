@@ -312,8 +312,12 @@
             "name":"ProductManagerService"
         },
         {
+            "name":"InventoryService",
+            "dependencies": ["ProductManagerService"]
+        },
+        {
             "name":"OrderService",
-            "dependencies": ["ProductManagerService", "TxtPrinterService"],
+            "dependencies": ["ProductManagerService", "InventoryService", "TxtPrinterService"],
             "config":{
                 "bill tpl file":"bills/activeTemplate.tpl"
             }

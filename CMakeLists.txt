@@ -41,6 +41,8 @@ option(THIMPOS_IGNORE_KEY_CHECK
 # target_link_libraries(${PROJECT_NAME} PRIVATE drogon)
 #
 # and comment out the following lines
+# Drogon được discover từ prefix chuẩn của toolchain MSYS2 UCRT64.
+# Không hardcode CMAKE_PREFIX_PATH/Drogon_DIR vào project.
 find_package(Drogon CONFIG REQUIRED)
 target_link_libraries(${PROJECT_NAME} PRIVATE Drogon::Drogon)
 

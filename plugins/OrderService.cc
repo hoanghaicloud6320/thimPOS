@@ -1,5 +1,6 @@
 #include "OrderService.h"
 #include "ProductManagerService.h"
+#include "InventoryService.h"
 #include <drogon/drogon.h>
 #include <stdexcept>
 #include <vector>
@@ -81,6 +82,10 @@ drogon::Task<OrderDTO> OrderService::createOrder(const std::vector<OrderItemInpu
     OrderDTO dto;
     dto.id = order_id;
     dto.total_price = total_price;
+    std::vector<std::pair<int64_t, int>> sold;
+    for (const auto& input : items) sold.emplace_back(input.product_id, input.quantity);
+    auto inventory = app().getPlugin<InventoryService>();
+    if (inventory) co_await inventory->consumeOrder(order_id, sold);
     // Map thêm thông tin nếu cần
     co_return dto;
 }
@@ -184,6 +189,10 @@ drogon::Task<OrderDTO> OrderService::replaceOrder(int64_t id, const std::vector<
 
     // 3. Trả về kết quả mới nhất
     auto updated = co_await getOrder(id);
+    std::vector<std::pair<int64_t, int>> sold;
+    for (const auto& input : items) sold.emplace_back(input.product_id, input.quantity);
+    if (auto inventory = app().getPlugin<InventoryService>())
+        co_await inventory->consumeOrder(id, sold);
     co_return updated.value();
 }
 
@@ -192,6 +201,10 @@ drogon::Task<bool> OrderService::deleteOrder(int64_t id)
     // Thứ tự xóa: Items trước, Order sau
     bool itemsDeleted = co_await repo_.deleteItemsByOrderId(id);
     bool orderDeleted = co_await repo_.deleteOrder(id);
+    if (orderDeleted) {
+        if (auto inventory = app().getPlugin<InventoryService>())
+            co_await inventory->consumeOrder(id, {});
+    }
     
     co_return (orderDeleted); // Chỉ quan tâm order đã xóa hay chưa
 }

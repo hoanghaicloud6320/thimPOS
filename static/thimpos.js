@@ -4,6 +4,7 @@
             name: "manager",
             items: [
                 { label: "Products", href: "/manager/products.html" },
+                { label: "Quản lý kho", href: "/manager/inventory.html" },
                 { label: "báo cáo sale", href: "/manager/sale-report.html" },
                 { label: "Quản lý tài khoản nhân viên", href: "/manager/accounts.html" }
             ]
@@ -110,7 +111,7 @@
         return nav;
     }
 
-    function createSidebar() {
+    function createSidebar(authState) {
         const sidebar = document.createElement("div");
         sidebar.className = "tp-sidebar";
 
@@ -121,6 +122,8 @@
         sidebar.appendChild(brand);
 
         NAV_TREE.forEach(folder => {
+            if (folder.name === "manager" && authState.role !== "manager") return;
+            if (folder.name === "staff" && !["manager", "staff"].includes(authState.role)) return;
             const box = document.createElement("div");
             box.className = "tp-folder";
 
@@ -161,7 +164,7 @@
         const body = document.body;
 
         const navbar = createNavbar(authState);
-        const sidebar = createSidebar();
+        const sidebar = createSidebar(authState);
 
         const main = document.createElement("div");
         main.className = "tp-main";

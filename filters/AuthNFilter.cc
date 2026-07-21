@@ -73,9 +73,8 @@ void AuthNFilter::doFilter(const HttpRequestPtr &req,
         auto token = req->getCookie("sid");
 
         auto reject = [&](const std::string &msg) {
-            writeAuditLog(
-                "Khách " + unauthorizedAction(req) +
-                " — chưa đăng nhập.");
+            // Không ghi request/view; audit chỉ dành cho sửa/xóa thành công.
+            // writeAuditLog("Khách truy cập khi chưa đăng nhập");
 
             Json::Value v;
             v["success"] = false;
