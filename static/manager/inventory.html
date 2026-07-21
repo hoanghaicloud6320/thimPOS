@@ -1,8 +1,183 @@
-<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>ThimPOS - Quản lý kho</title><link rel="stylesheet" href="/thimpos.css"><style>.page{padding:20px;color:var(--tp-text)}.card{background:var(--tp-panel);padding:16px;border-radius:12px;margin-bottom:16px}.row{display:flex;gap:8px;flex-wrap:wrap}input,select,button{padding:8px;border:0;border-radius:6px;background:#1f2937;color:inherit}button{background:var(--tp-active);cursor:pointer}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #334155;text-align:left}.bad{color:#fb7185}.muted{opacity:.55}</style></head><body><main class="page"><h1>Quản lý kho</h1>
-<section class="card"><h2>Nguyên liệu</h2><div class="row"><input id="iname" placeholder="Tên nguyên liệu"><input id="iunit" placeholder="Đơn vị (g, cái, ml...)"><button onclick="addItem()">Thêm</button></div><table><thead><tr><th>Tên</th><th>Đơn vị</th><th>Tồn tính từ sổ</th><th></th></tr></thead><tbody id="items"></tbody></table></section>
-<section class="card"><h2>Nhập lô</h2><div class="row"><select id="litem"></select><input id="lqty" type="number" step="any" placeholder="Số lượng"><input id="lcost" type="number" placeholder="Giá nhập / đơn vị"><label>Mua <input id="lbought" type="date"></label><label>Hết hạn <input id="lexp" type="date"></label><input id="lnote" placeholder="Ghi chú"><button onclick="addLot()">Nhập kho</button></div><table><thead><tr><th>Nguyên liệu</th><th>Nhập</th><th>Còn</th><th>Giá nhập</th><th>Ngày mua</th><th>Hết hạn</th><th></th></tr></thead><tbody id="lots"></tbody></table></section>
-<section class="card"><h2>Công thức sản phẩm</h2><div class="row"><select id="rproduct"></select><select id="ritem"></select><input id="rqty" type="number" step="any" placeholder="Lượng dùng / 1 sản phẩm"><button onclick="addRecipe()">Liên kết</button></div><table><thead><tr><th>Sản phẩm</th><th>Nguyên liệu</th><th>Lượng dùng</th><th></th></tr></thead><tbody id="recipes"></tbody></table></section></main><script>
-const api='/api/inventory';let products=[],itemData=[];const req=async(u,o={})=>{const r=await fetch(u,{headers:{'Content-Type':'application/json'},...o});if(!r.ok){alert((await r.json()).error||'Có lỗi xảy ra');return null}return r.json()}, epoch=id=>Math.floor(new Date(document.getElementById(id).value+'T00:00:00').getTime()/1000), date=x=>new Date(x*1000).toLocaleDateString('vi-VN');
-async function load(){const [items,lots,recipes,p]=await Promise.all([req(api+'/items'),req(api+'/lots'),req(api+'/recipes'),req('/api/products?limit=100&active_only=true')]);if(!items)return;itemData=items;products=p.data;itemsEl=document.getElementById('items');itemsEl.innerHTML=items.map(i=>`<tr class="${i.is_active?'':'muted'}"><td>${i.name}</td><td>${i.unit}</td><td class="${i.on_hand<0?'bad':''}">${i.on_hand}</td><td><button onclick="toggleItem(${i.id},'${i.name}','${i.unit}',${!i.is_active})">${i.is_active?'Ẩn':'Mở'}</button></td></tr>`).join('');document.querySelectorAll('#litem,#ritem').forEach(s=>s.innerHTML=items.filter(i=>i.is_active).map(i=>`<option value="${i.id}">${i.name} (${i.unit})</option>`).join(''));document.getElementById('rproduct').innerHTML=products.map(x=>`<option value="${x.id}">${x.name}</option>`).join('');document.getElementById('lots').innerHTML=lots.map(l=>`<tr class="${l.is_void?'muted':''}"><td>${l.item_name}</td><td>${l.quantity}</td><td>${l.remaining}</td><td>${l.unit_cost.toLocaleString('vi-VN')}</td><td>${date(l.purchased_at)}</td><td class="${l.expires_at<Date.now()/1000?'bad':''}">${date(l.expires_at)}</td><td>${l.is_void?'Đã hủy':`<button onclick="voidLot(${l.id})">Hủy lô</button>`}</td></tr>`).join('');document.getElementById('recipes').innerHTML=recipes.map(x=>`<tr class="${x.is_active?'':'muted'}"><td>${products.find(p=>p.id==x.product_id)?.name||'#'+x.product_id}</td><td>${x.item_name}</td><td>${x.quantity} ${x.unit}</td><td><button onclick="toggleRecipe(${x.id},${x.quantity},${!x.is_active})">${x.is_active?'Ẩn':'Mở'}</button></td></tr>`).join('')}
-async function addItem(){await req(api+'/items',{method:'POST',body:JSON.stringify({name:iname.value,unit:iunit.value})});load()}async function toggleItem(id,name,unit,a){await req(api+'/items/'+id,{method:'PUT',body:JSON.stringify({name,unit,is_active:a})});load()}async function addLot(){await req(api+'/lots',{method:'POST',body:JSON.stringify({item_id:+litem.value,quantity:+lqty.value,unit_cost:+lcost.value,purchased_at:epoch('lbought'),expires_at:epoch('lexp'),note:lnote.value})});load()}async function voidLot(id){if(confirm('Hủy lô bằng một bút toán đảo ngược?')){await req(api+'/lots/'+id,{method:'DELETE',body:JSON.stringify({note:'Hủy từ màn hình quản lý'})});load()}}async function addRecipe(){await req(api+'/recipes',{method:'POST',body:JSON.stringify({product_id:+rproduct.value,item_id:+ritem.value,quantity:+rqty.value})});load()}async function toggleRecipe(id,q,a){await req(api+'/recipes/'+id,{method:'PUT',body:JSON.stringify({quantity:q,is_active:a})});load()}load();
-</script><script src="/thimpos.js" defer></script></body></html>
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ThimPOS - Quản lý kho</title>
+<link rel="stylesheet" href="/thimpos.css">
+<style>
+.page{color:var(--tp-text);max-width:1400px;margin:auto}.page-header{display:flex;justify-content:space-between;align-items:end;gap:16px;margin-bottom:22px}.page-header h1{margin:0;font-size:28px}.page-header p{margin:5px 0 0;color:var(--tp-muted)}.card{background:var(--tp-panel);padding:18px;border:1px solid #263244;border-radius:14px;margin-bottom:18px;box-shadow:0 8px 24px rgba(2,6,23,.18)}.card h2{margin:0 0 15px;font-size:18px}.form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end;margin-bottom:18px}.field{display:flex;flex-direction:column;gap:6px}.field label{font-size:12px;font-weight:600;color:var(--tp-muted)}input,select,button{min-height:40px;padding:9px 11px;border:1px solid #334155;border-radius:8px;background:#1e293b;color:inherit;box-sizing:border-box}input:focus,select:focus{outline:2px solid #3b82f6;outline-offset:1px}button{border:0;background:var(--tp-active);font-weight:600;cursor:pointer;transition:filter .15s,transform .15s}button:hover{filter:brightness(1.12)}button:active{transform:translateY(1px)}button:disabled{opacity:.55;cursor:not-allowed}.btn-muted{background:#475569}.btn-danger{background:#b91c1c}.table-wrap{overflow-x:auto;border:1px solid #263244;border-radius:10px}table{width:100%;border-collapse:collapse;min-width:650px}th,td{padding:11px 12px;border-bottom:1px solid #263244;text-align:left}th{background:#172033;color:#cbd5e1;font-size:12px;text-transform:uppercase;letter-spacing:.03em}tbody tr:last-child td{border-bottom:0}tbody tr:hover{background:#182337}.bad{color:#fb7185;font-weight:600}.muted{opacity:.55}.empty{text-align:center;color:var(--tp-muted);padding:28px}.toast-stack{position:fixed;top:72px;right:18px;z-index:1300;display:grid;gap:10px;width:min(360px,calc(100vw - 36px))}.toast{display:flex;align-items:flex-start;gap:10px;padding:13px 14px;background:#172033;border:1px solid #334155;border-left:4px solid #22c55e;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.3);animation:toast-in .2s ease}.toast.error{border-left-color:#ef4444}.toast button{margin-left:auto;background:transparent;min-height:auto;padding:0;color:#94a3b8;font-size:18px}.dialog-backdrop{position:fixed;inset:0;z-index:1400;background:rgba(2,6,23,.72);display:none;place-items:center;padding:20px}.dialog-backdrop.open{display:grid}.dialog{width:min(430px,100%);background:#111827;border:1px solid #334155;border-radius:14px;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.45)}.dialog h3{margin:0 0 8px}.dialog p{margin:0;color:#cbd5e1;line-height:1.5}.dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}@keyframes toast-in{from{opacity:0;transform:translateY(-8px)}}@media(max-width:640px){.page-header{align-items:start;flex-direction:column}.card{padding:14px}.form-row{grid-template-columns:1fr}.form-row button{width:100%}}
+.tp-main{background:#07111f}.page{color:#f8fafc}.page-header p{color:#cbd5e1}.card{background:#111c2e;border-color:#334155}.card h2{color:#fff}.field label{color:#dbeafe;font-size:13px}input,select{background:#f8fafc;color:#0f172a;border-color:#94a3b8}input::placeholder{color:#64748b;opacity:1}input:focus,select:focus{outline-color:#60a5fa;border-color:#60a5fa}button{color:#fff}.btn-muted{background:#475569;color:#fff}.btn-danger{background:#dc2626;color:#fff}.table-wrap{border-color:#475569;background:#0c1728}th{background:#1e293b;color:#f1f5f9}td{color:#e2e8f0;border-bottom-color:#334155}tbody tr:hover{background:#1e293b}.muted{opacity:.72}.empty{color:#cbd5e1}.toast{background:#f8fafc;color:#0f172a;border-color:#cbd5e1}.toast button{color:#475569}.dialog{background:#f8fafc;color:#0f172a}.dialog p{color:#334155}
+.recipe-heading{margin-bottom:15px}.recipe-heading h2{margin-bottom:4px}.recipe-hint{margin:0;color:#cbd5e1;font-size:13px}.recipe-list{display:grid;gap:12px}.recipe-folder{overflow:hidden;border:1px solid #475569;border-radius:11px;background:#0c1728}.recipe-folder summary{display:flex;align-items:center;gap:10px;padding:11px 14px;background:#1e293b;color:#fff;cursor:pointer;list-style:none}.recipe-folder summary::-webkit-details-marker{display:none}.folder-icon{font-size:21px}.folder-name{font-weight:700;flex:1}.folder-count{color:#cbd5e1;font-size:12px;font-weight:500}.folder-add{min-height:34px;padding:6px 11px;background:#2563eb}.recipe-folder[open] .folder-icon{filter:saturate(1.2)}.recipe-row{display:grid;grid-template-columns:minmax(160px,1fr) minmax(120px,.45fr);gap:16px;align-items:center;padding:10px 14px;border-top:1px solid #334155}.recipe-name{display:flex;align-items:center;gap:9px;color:#e2e8f0}.recipe-name::before{content:'↳';color:#60a5fa;font-weight:700}.recipe-quantity{color:#f8fafc;font-variant-numeric:tabular-nums;text-align:right}.recipe-empty{padding:22px 14px;text-align:center;color:#cbd5e1;border-top:1px solid #334155}.recipe-list>.recipe-empty{border:1px solid #475569;border-radius:10px;background:#0c1728}.recipe-dialog-form{display:grid;gap:14px;margin-top:18px}.recipe-dialog-form .field label{color:#334155}@media(max-width:640px){.folder-count{display:none}.folder-add{font-size:12px}.recipe-row{grid-template-columns:1fr auto;gap:8px}}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="page-header"><div><h1>Quản lý kho</h1><p>Theo dõi nguyên liệu, lô nhập và định lượng sản phẩm.</p></div></header>
+
+  <section class="card">
+    <h2>Nguyên liệu</h2>
+    <div class="form-row">
+      <div class="field"><label for="iname">Tên nguyên liệu</label><input id="iname" placeholder="Ví dụ: Cà phê hạt"></div>
+      <div class="field"><label for="iunit">Đơn vị</label><input id="iunit" placeholder="g, cái, ml..."></div>
+      <button id="addItemBtn" onclick="addItem()">Thêm nguyên liệu</button>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>Tên</th><th>Đơn vị</th><th>Tồn tính từ sổ</th><th>Thao tác</th></tr></thead><tbody id="items"></tbody></table></div>
+  </section>
+
+  <section class="card">
+    <h2>Nhập lô</h2>
+    <div class="form-row">
+      <div class="field"><label for="litem">Nguyên liệu</label><select id="litem"></select></div>
+      <div class="field"><label for="lqty">Số lượng</label><input id="lqty" type="number" min="0" step="any" placeholder="0"></div>
+      <div class="field"><label for="lcost">Giá nhập / đơn vị</label><input id="lcost" type="number" min="0" step="any" placeholder="0"></div>
+      <div class="field"><label for="lbought">Ngày mua</label><input id="lbought" type="date"></div>
+      <div class="field"><label for="lexp">Ngày hết hạn</label><input id="lexp" type="date"></div>
+      <div class="field"><label for="lnote">Ghi chú</label><input id="lnote" placeholder="Không bắt buộc"></div>
+      <button id="addLotBtn" onclick="addLot()">Nhập kho</button>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>Nguyên liệu</th><th>Nhập</th><th>Còn</th><th>Giá nhập</th><th>Ngày mua</th><th>Hết hạn</th><th>Thao tác</th></tr></thead><tbody id="lots"></tbody></table></div>
+  </section>
+
+  <section class="card">
+    <div class="recipe-heading"><h2>Công thức sản phẩm</h2><p class="recipe-hint">Click vào folder để mở rộng công thức chi tiết cho món đó.</p></div>
+    <div id="recipes" class="recipe-list"></div>
+  </section>
+</main>
+
+<div id="toasts" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
+<div id="confirmDialog" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="dialogTitle">
+  <div class="dialog">
+    <h3 id="dialogTitle">Xác nhận hủy lô</h3>
+    <p>Hệ thống sẽ tạo một bút toán đảo ngược. Dữ liệu lô vẫn được giữ lại để đối soát.</p>
+    <div class="dialog-actions"><button class="btn-muted" onclick="closeConfirm(false)">Giữ lại</button><button class="btn-danger" onclick="closeConfirm(true)">Hủy lô</button></div>
+  </div>
+</div>
+<div id="recipeDialog" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="recipeDialogTitle">
+  <div class="dialog">
+    <h3 id="recipeDialogTitle">Thêm nguyên liệu</h3>
+    <p id="recipeProductName"></p>
+    <div class="recipe-dialog-form">
+      <div class="field"><label for="recipeItem">Nguyên liệu</label><select id="recipeItem"></select></div>
+      <div class="field"><label for="recipeQuantity">Lượng dùng / sản phẩm</label><input id="recipeQuantity" type="number" min="0" step="any" placeholder="0"></div>
+    </div>
+    <div class="dialog-actions"><button class="btn-muted" onclick="closeRecipeDialog()">Đóng</button><button onclick="addRecipe()">Thêm nguyên liệu</button></div>
+  </div>
+</div>
+
+<script>
+const api = '/api/inventory';
+let products = [], inventoryItems = [], selectedRecipeProductId = null;
+let confirmResolver = null;
+const $ = id => document.getElementById(id);
+const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+const encodeArg = value => encodeURIComponent(String(value ?? '')).replace(/'/g, '%27');
+
+function toast(message, type = 'success') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${type === 'error' ? '⚠️' : '✓'}</span><span>${escapeHtml(message)}</span><button aria-label="Đóng thông báo">×</button>`;
+  el.querySelector('button').onclick = () => el.remove();
+  $('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 4500);
+}
+
+async function req(url, options = {}) {
+  try {
+    const response = await fetch(url, {headers:{'Content-Type':'application/json'}, ...options});
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || data.message || 'Có lỗi xảy ra');
+    return data;
+  } catch (error) {
+    toast(error.message === 'Failed to fetch' ? 'Không thể kết nối tới máy chủ' : error.message, 'error');
+    return null;
+  }
+}
+
+function askToVoid() {
+  $('confirmDialog').classList.add('open');
+  return new Promise(resolve => { confirmResolver = resolve; });
+}
+function closeConfirm(result) {
+  $('confirmDialog').classList.remove('open');
+  if (confirmResolver) confirmResolver(result);
+  confirmResolver = null;
+}
+$('confirmDialog').addEventListener('click', event => { if (event.target === $('confirmDialog')) closeConfirm(false); });
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape') return;
+  if ($('confirmDialog').classList.contains('open')) closeConfirm(false);
+  if ($('recipeDialog').classList.contains('open')) closeRecipeDialog();
+});
+
+const epoch = id => {
+  const value = $(id).value;
+  return value ? Math.floor(new Date(value + 'T00:00:00').getTime() / 1000) : 0;
+};
+const date = value => value ? new Date(value * 1000).toLocaleDateString('vi-VN') : '—';
+const emptyRow = (columns, text) => `<tr><td colspan="${columns}" class="empty">${text}</td></tr>`;
+
+function renderRecipeGroups(recipes) {
+  if (!products.length) return '<div class="recipe-empty">Chưa có sản phẩm</div>';
+  return products.map(product => {
+    const rows = recipes.filter(recipe => recipe.product_id == product.id);
+    return `<details class="recipe-folder">
+      <summary><span class="folder-icon">📁</span><span class="folder-name">${escapeHtml(product.name)}</span><span class="folder-count">${rows.length} nguyên liệu</span><button class="folder-add" onclick="event.preventDefault();event.stopPropagation();openRecipeDialog(${product.id})">+ Thêm nguyên liệu</button></summary>
+      ${rows.length ? rows.map(recipe => `
+        <div class="recipe-row ${recipe.is_active ? '' : 'muted'}">
+          <div class="recipe-name">${escapeHtml(recipe.item_name)}</div>
+          <div class="recipe-quantity">${recipe.quantity} ${escapeHtml(recipe.unit)}</div>
+        </div>`).join('') : '<div class="recipe-empty">Folder này chưa có nguyên liệu</div>'}
+    </details>`;
+  }).join('');
+}
+
+function openRecipeDialog(productId) {
+  const product = products.find(item => item.id == productId);
+  selectedRecipeProductId = productId;
+  $('recipeDialogTitle').textContent = 'Thêm nguyên liệu';
+  $('recipeProductName').textContent = product ? `Sản phẩm: ${product.name}` : '';
+  $('recipeItem').innerHTML = inventoryItems.filter(item => item.is_active).map(item => `<option value="${item.id}">${escapeHtml(item.name)} (${escapeHtml(item.unit)})</option>`).join('');
+  $('recipeQuantity').value = '';
+  $('recipeDialog').classList.add('open');
+  setTimeout(() => $('recipeItem').focus(), 0);
+}
+function closeRecipeDialog() { $('recipeDialog').classList.remove('open'); selectedRecipeProductId = null; }
+$('recipeDialog').addEventListener('click', event => { if (event.target === $('recipeDialog')) closeRecipeDialog(); });
+
+async function load() {
+  const [items, lots, recipes, productResult] = await Promise.all([
+    req(api + '/items'), req(api + '/lots'), req(api + '/recipes'), req('/api/products?limit=100&active_only=true')
+  ]);
+  if (!items || !lots || !recipes || !productResult) return;
+  products = productResult.data || [];
+  inventoryItems = items;
+  $('items').innerHTML = items.length ? items.map(item => `<tr class="${item.is_active?'':'muted'}"><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.unit)}</td><td class="${item.on_hand<0?'bad':''}">${item.on_hand}</td><td><button class="btn-muted" onclick="toggleItem(${item.id},decodeURIComponent('${encodeArg(item.name)}'),decodeURIComponent('${encodeArg(item.unit)}'),${!item.is_active})">${item.is_active?'Ẩn':'Mở'}</button></td></tr>`).join('') : emptyRow(4, 'Chưa có nguyên liệu');
+  $('litem').innerHTML = items.filter(item => item.is_active).map(item => `<option value="${item.id}">${escapeHtml(item.name)} (${escapeHtml(item.unit)})</option>`).join('');
+  $('lots').innerHTML = lots.length ? lots.map(lot => `<tr class="${lot.is_void?'muted':''}"><td>${escapeHtml(lot.item_name)}</td><td>${lot.quantity}</td><td>${lot.remaining}</td><td>${Number(lot.unit_cost).toLocaleString('vi-VN')}</td><td>${date(lot.purchased_at)}</td><td class="${lot.expires_at && lot.expires_at<Date.now()/1000?'bad':''}">${date(lot.expires_at)}</td><td>${lot.is_void?'Đã hủy':`<button class="btn-danger" onclick="voidLot(${lot.id})">Hủy lô</button>`}</td></tr>`).join('') : emptyRow(7, 'Chưa có lô nhập');
+  $('recipes').innerHTML = renderRecipeGroups(recipes);
+}
+
+async function addItem() {
+  if (!$('iname').value.trim() || !$('iunit').value.trim()) return toast('Vui lòng nhập tên và đơn vị nguyên liệu', 'error');
+  const result = await req(api+'/items',{method:'POST',body:JSON.stringify({name:$('iname').value.trim(),unit:$('iunit').value.trim()})});
+  if (!result) return;
+  $('iname').value = ''; $('iunit').value = ''; toast('Đã thêm nguyên liệu'); load();
+}
+async function toggleItem(id,name,unit,isActive) { if (await req(api+'/items/'+id,{method:'PUT',body:JSON.stringify({name,unit,is_active:isActive})})) { toast(isActive?'Đã mở nguyên liệu':'Đã ẩn nguyên liệu'); load(); } }
+async function addLot() {
+  if (!$('litem').value || +$('lqty').value <= 0 || +$('lcost').value < 0 || !epoch('lbought') || !epoch('lexp')) return toast('Vui lòng nhập đầy đủ thông tin lô hợp lệ', 'error');
+  const result = await req(api+'/lots',{method:'POST',body:JSON.stringify({item_id:+$('litem').value,quantity:+$('lqty').value,unit_cost:+$('lcost').value,purchased_at:epoch('lbought'),expires_at:epoch('lexp'),note:$('lnote').value.trim()})});
+  if (!result) return;
+  ['lqty','lcost','lnote'].forEach(id => $(id).value=''); toast('Đã nhập lô vào kho'); load();
+}
+async function voidLot(id) { if (!await askToVoid()) return; if (await req(api+'/lots/'+id,{method:'DELETE',body:JSON.stringify({note:'Hủy từ màn hình quản lý'})})) { toast('Đã hủy lô và tạo bút toán đảo ngược'); load(); } }
+async function addRecipe() {
+  if (!selectedRecipeProductId || !$('recipeItem').value || +$('recipeQuantity').value <= 0) return toast('Vui lòng chọn nguyên liệu và nhập lượng dùng hợp lệ', 'error');
+  if (await req(api+'/recipes',{method:'POST',body:JSON.stringify({product_id:+selectedRecipeProductId,item_id:+$('recipeItem').value,quantity:+$('recipeQuantity').value})})) { closeRecipeDialog(); toast('Đã thêm nguyên liệu vào công thức'); load(); }
+}
+load();
+</script>
+<script src="/thimpos.js" defer></script>
+</body>
+</html>
