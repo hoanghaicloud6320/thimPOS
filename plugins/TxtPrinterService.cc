@@ -51,7 +51,7 @@ Task<void> TxtPrinterService::saveStringToFile(const std::string &content,
 Task<void> TxtPrinterService::printFile(const std::string &filePath)
 {
     // escape path đơn giản (support path có space)
-    std::string cmd = "notepad /pt \"" + filePath + "\"";
+    std::string cmd = "notepad /p \"" + filePath + "\"";
 
     //LOG_INFO << "[TxtPrinterService] 🖨️ printing: " << filePath;
 
