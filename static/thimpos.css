@@ -180,11 +180,14 @@ body.tp-sidebar-open .tp-sidebar {
 }
 
 body.tp-sidebar-open .tp-overlay {
-    display: block;
+    display: none;
 }
 
 /* ===== MOBILE ADJUSTMENTS ===== */
 @media (max-width: 768px) {
+    body.tp-sidebar-open .tp-overlay {
+        display: block;
+    }
     .tp-main {
         margin-left: 0 !important;
         padding: 16px;

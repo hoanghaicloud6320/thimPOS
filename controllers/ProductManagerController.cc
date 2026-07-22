@@ -1,5 +1,6 @@
 #include "ProductManagerController.h"
 #include "../plugins/ProductManagerService.h"
+#include "../AuditLog.h"
 
 using namespace drogon;
 
@@ -189,6 +190,7 @@ Task<HttpResponsePtr> ProductManagerController::update(const HttpRequestPtr req,
     bool isActive = (*json)["is_active"].asBool();
 
     auto svc = app().getPlugin<ProductManagerService>();
+    auto previous = co_await svc->getProductById(id, false);
     bool ok = co_await svc->updateProduct(id, name, price, description, image_url, category, isActive);
 
     if (!ok)
@@ -196,6 +198,14 @@ Task<HttpResponsePtr> ProductManagerController::update(const HttpRequestPtr req,
 
     Json::Value resp;
     resp["success"] = true;
+    Json::Value before;
+    if (previous) {
+        before["name"] = previous->name; before["price"] = previous->price;
+        before["description"] = previous->description; before["image_url"] = previous->imageUrl;
+        before["category"] = previous->category; before["is_active"] = previous->isActive;
+    }
+    writeChangeAudit(req, "SỬA SẢN PHẨM", "product#" + std::to_string(id), before, *json,
+                     {"name", "price", "description", "image_url", "category", "is_active"});
     co_return jsonResponse(resp);
 }
 
@@ -209,6 +219,7 @@ Task<HttpResponsePtr> ProductManagerController::remove(const HttpRequestPtr req,
     }
 
     auto svc = app().getPlugin<ProductManagerService>();
+    auto previous = co_await svc->getProductById(id, false);
     bool ok = co_await svc->deleteProduct(id);
 
     if (!ok)
@@ -216,5 +227,11 @@ Task<HttpResponsePtr> ProductManagerController::remove(const HttpRequestPtr req,
 
     Json::Value resp;
     resp["success"] = true;
+    if (previous) {
+        Json::Value before, after;
+        before["is_active"] = previous->isActive; after["is_active"] = false;
+        writeChangeAudit(req, "XÓA SẢN PHẨM", "product#" + std::to_string(id), before, after,
+                         {"is_active"});
+    }
     co_return jsonResponse(resp);
 }

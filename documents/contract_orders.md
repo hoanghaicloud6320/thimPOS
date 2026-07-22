@@ -157,7 +157,14 @@ created_at   INTEGER
 
 # 📄 3. LIST ORDERS (SUMMARY ONLY)
 
-## `GET /api/orders?limit=20&offset=0`
+## `GET /api/orders?limit=20&offset=0&from=1714000000&to=1715000000&include_items=true`
+
+Optional query parameters:
+
+- `from`, `to`: inclusive `created_at` epoch range.
+- `include_items=true`: include product lines in each list item, avoiding one
+  client request per order.
+- `limit`: 1–500; `offset` must be non-negative.
 
 ### Require Role
 

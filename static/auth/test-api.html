@@ -71,7 +71,7 @@
 <!-- CHANGE PASSWORD -->
 <h2>Change Password (manager)</h2>
 <input id="cp_user" placeholder="username">
-<input id="cp_pass" placeholder="new password">
+<input id="cp_pass" placeholder="new password" type="password">
 <button onclick="changePassword()">Change</button>
 
 <h2>📦 Response</h2>
@@ -167,6 +167,7 @@ async function changePassword() {
     show(await res.json());
 }
 </script>
+<script src="/password-toggle.js"></script>
 
 </body>
 </html>

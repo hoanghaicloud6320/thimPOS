@@ -88,7 +88,10 @@ public:
      */
     [[nodiscard]] drogon::Task<std::vector<OrderDTO>> listOrders(
         int limit,
-        int offset
+        int offset,
+        std::optional<int64_t> from = std::nullopt,
+        std::optional<int64_t> to = std::nullopt,
+        bool includeItems = false
     );
 
     /**

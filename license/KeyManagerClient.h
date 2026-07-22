@@ -2,6 +2,7 @@
 
 #include <string>
 #include <string_view>
+#include <unordered_map>
 
 namespace thimpos::license
 {
@@ -9,6 +10,7 @@ struct VerifiedLicense
 {
     std::string registrantName;
     std::string expiresAt;
+    std::unordered_map<std::string, std::string> metadata;
 };
 
 class KeyManagerClient

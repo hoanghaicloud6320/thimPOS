@@ -1,5 +1,6 @@
 #include <drogon/drogon.h>
 #include "AuditLog.h"
+#include "plugins/AiService.h"
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
@@ -240,6 +241,8 @@ std::string auditResult(drogon::HttpStatusCode status)
     return "không thành công";
 }
 
+// Audit request/view cũ được giữ lại để tham khảo nhưng không biên dịch.
+#if 0
 void registerAuditLogger()
 {
     drogon::app().registerPostHandlingAdvice(
@@ -258,6 +261,7 @@ void registerAuditLogger()
                 auditResult(response->statusCode()) + ".");
         });
 }
+#endif
 
 std::string newLogFilePath()
 {
@@ -354,6 +358,7 @@ int main(int argc, char *argv[])
     {
         thimpos::license::KeyManagerClient verifier;
         const auto license = verifier.verifyAtStartup();
+        AiService::configureFromLicense(license.metadata);
         std::cout << "Bản quyền hợp lệ / License valid: " << license.registrantName
                   << " (hết hạn / expires " << license.expiresAt << ")\n";
     }
@@ -366,6 +371,7 @@ int main(int argc, char *argv[])
     }
 #else
     std::cerr << "WARNING: license-key verification is disabled in this build\n";
+    AiService::configureFromLicense({});
 #endif
 
     // Load config first, then install a dual-sink logger before Drogon starts
@@ -380,7 +386,9 @@ int main(int argc, char *argv[])
             auditLogger->set_pattern("%Y-%m-%d %H:%M:%S | %v");
         }
     });
-    registerAuditLogger();
+    // Không audit request xem/list/search. Các controller chỉ ghi thao tác
+    // sửa/xóa thành công, kèm diff field mà người dùng có thể chỉnh.
+    // registerAuditLogger();
 
     // Run HTTP framework; this blocks in the internal event loop.
     drogon::app().run();

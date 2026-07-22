@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Báo cáo AI</title>
+<style>
+.report-shell {
+    min-height: calc(100vh - 88px);
+    display: grid;
+    place-items: center;
+    padding: 32px 20px;
+    color: var(--tp-text);
+}
+
+.report-hero {
+    width: min(760px, 100%);
+    padding: 48px;
+    border: 1px solid rgba(129, 140, 248, .28);
+    border-radius: 24px;
+    background:
+        radial-gradient(circle at top right, rgba(124, 58, 237, .22), transparent 42%),
+        var(--tp-panel);
+    box-shadow: 0 24px 80px rgba(2, 6, 23, .38);
+}
+
+.report-badge {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    padding: 7px 12px;
+    border-radius: 999px;
+    background: rgba(99, 102, 241, .14);
+    color: #a5b4fc;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.report-hero h1 {
+    margin: 18px 0 12px;
+    font-size: clamp(32px, 7vw, 58px);
+    line-height: 1.02;
+    letter-spacing: -.04em;
+}
+
+.report-hero h1 span {
+    color: #a78bfa;
+}
+
+.report-hero p {
+    max-width: 600px;
+    margin: 0;
+    color: var(--tp-muted);
+    font-size: 17px;
+    line-height: 1.65;
+}
+
+.report-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 28px;
+    font-size: 14px;
+}
+
+.report-status::before {
+    content: "";
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 18px #22c55e;
+}
+
+@media (max-width: 600px) {
+    .report-hero { padding: 32px 24px; }
+}
+</style>
+</head>
+<body>
+<main class="report-shell">
+    <section class="report-hero">
+        <div class="report-badge">✦ Gemini powered</div>
+        <h1>Báo cáo bán hàng<br><span>sử dụng AI</span></h1>
+        <p>Không chỉ xem số liệu. ThimPOS sẽ giúp bạn đọc xu hướng, phát hiện bất thường và biến dữ liệu bán hàng thành gợi ý dễ hành động.</p>
+        <div class="report-status">Đang chuẩn bị kết nối trợ lý phân tích</div>
+    </section>
+</main>
+
+<link rel="stylesheet" href="/thimpos.css">
+<script src="/thimpos.js" defer></script>
+</body>
+</html>

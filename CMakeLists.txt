@@ -41,15 +41,23 @@ option(THIMPOS_IGNORE_KEY_CHECK
 # target_link_libraries(${PROJECT_NAME} PRIVATE drogon)
 #
 # and comment out the following lines
+# Drogon được discover từ prefix chuẩn của toolchain MSYS2 UCRT64.
+# Không hardcode CMAKE_PREFIX_PATH/Drogon_DIR vào project.
 find_package(Drogon CONFIG REQUIRED)
 target_link_libraries(${PROJECT_NAME} PRIVATE Drogon::Drogon)
+
+# gem-copilot is consumed as a small library. Its standalone Qt applications
+# are intentionally not added to the ThimPOS build.
+find_package(CURL REQUIRED)
+target_sources(${PROJECT_NAME} PRIVATE gem-copilot/src/gemini_engine.cpp)
+target_include_directories(${PROJECT_NAME} PRIVATE gem-copilot/include)
+target_link_libraries(${PROJECT_NAME} PRIVATE CURL::libcurl)
 
 if (THIMPOS_IGNORE_KEY_CHECK)
     target_compile_definitions(${PROJECT_NAME} PRIVATE THIMPOS_IGNORE_KEY_CHECK=1)
     message(WARNING "ThimPOS license-key verification is DISABLED for this build")
 else ()
     find_package(OpenSSL REQUIRED COMPONENTS Crypto)
-    find_package(CURL REQUIRED)
     target_sources(${PROJECT_NAME} PRIVATE license/KeyManagerClient.cc)
     target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/license)
     target_link_libraries(${PROJECT_NAME} PRIVATE OpenSSL::Crypto CURL::libcurl)

@@ -1,31 +1,33 @@
 (function () {
     const NAV_TREE = [
         {
-            name: "manager",
+            name: "Quản lý",
             items: [
-                { label: "Products", href: "/manager/products.html" },
-                { label: "báo cáo sale", href: "/manager/sale-report.html" },
-                { label: "Quản lý tài khoản nhân viên", href: "/manager/accounts.html" }
+                { label: "Sản phẩm", href: "/manager/products.html" },
+                { label: "Quản lý kho", href: "/manager/inventory.html" },
+                { label: "Báo cáo AI", href: "/manager/report.html" },
+                { label: "Chat với AI", href: "/manager/chat.html" },
+                { label: "Tài khoản nhân viên", href: "/manager/accounts.html" }
             ]
         },
         {
-            name: "staff",
+            name: "Bán hàng",
             items: [
-                { label: "Make Order", href: "/" },
-                { label: "Order CRUD", href: "/staff/order-crud.html" }
+                { label: "Tạo đơn hàng", href: "/" },
+                { label: "Quản lý đơn hàng", href: "/staff/order-crud.html" }
             ]
         },
         {
-            name: "đăng nhập/đăng ký",
+            name: "Tài khoản",
             items: [
-                { label: "đăng nhập", href: "/auth/login.html" },
-                { label: "đăng ký", href: "/auth/signup.html" }
+                { label: "Đăng nhập", href: "/auth/login.html" },
+                { label: "Đăng ký", href: "/auth/signup.html" }
             ]
         }
     ];
 
     function isMobile() {
-        return window.innerWidth <= 7680;
+        return window.innerWidth <= 768;
     }
 
     async function checkAuth() {
@@ -110,7 +112,7 @@
         return nav;
     }
 
-    function createSidebar() {
+    function createSidebar(authState) {
         const sidebar = document.createElement("div");
         sidebar.className = "tp-sidebar";
 
@@ -161,7 +163,7 @@
         const body = document.body;
 
         const navbar = createNavbar(authState);
-        const sidebar = createSidebar();
+        const sidebar = createSidebar(authState);
 
         const main = document.createElement("div");
         main.className = "tp-main";

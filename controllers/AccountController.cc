@@ -1,4 +1,5 @@
 #include "AccountController.h"
+#include "../AuditLog.h"
 
 using namespace drogon;
 
@@ -121,6 +122,7 @@ Task<HttpResponsePtr> AccountController::updateAccount(HttpRequestPtr req, std::
     entity.username = username; 
 
     auto* service = app().getPlugin<AccountManagementService>();
+    auto previous = co_await service->getAccountDetail(username);
     auto result = co_await service->updateAccount(entity);
 
     if (!result.success) {
@@ -130,6 +132,10 @@ Task<HttpResponsePtr> AccountController::updateAccount(HttpRequestPtr req, std::
     Json::Value root;
     root["status"] = "success";
     root["data"] = toJson(result.data);
+    if (previous.success)
+        writeChangeAudit(req, "SỬA TÀI KHOẢN", "account:" + username,
+                         toJson(previous.data), toJson(result.data),
+                         {"role", "email", "phone_number", "full_name", "avatar_url", "date_of_birth"});
     co_return HttpResponse::newHttpJsonResponse(root);
 }
 
@@ -139,6 +145,7 @@ Task<HttpResponsePtr> AccountController::deleteAccount(HttpRequestPtr req, std::
     if (role != "manager") co_return makeErrorResponse(403, "không đủ quyền");
 
     auto* service = app().getPlugin<AccountManagementService>();
+    auto previous = co_await service->getAccountDetail(username);
     auto result = co_await service->deleteAccount(username);
 
     if (!result.success) {
@@ -148,6 +155,10 @@ Task<HttpResponsePtr> AccountController::deleteAccount(HttpRequestPtr req, std::
     Json::Value root;
     root["status"] = "success";
     root["message"] = "Deleted";
+    if (previous.success)
+        writeChangeAudit(req, "XÓA TÀI KHOẢN", "account:" + username,
+                         toJson(previous.data), Json::Value(Json::objectValue),
+                         {"role", "email", "phone_number", "full_name", "avatar_url", "date_of_birth"});
     co_return HttpResponse::newHttpJsonResponse(root);
 }
 
@@ -185,6 +196,7 @@ Task<HttpResponsePtr> AccountController::updateCurrentUser(HttpRequestPtr req) {
     entity.username = currentUsername; 
 
     auto* service = app().getPlugin<AccountManagementService>();
+    auto previous = co_await service->getAccountDetail(currentUsername);
     auto result = co_await service->updateAccount(entity);
 
     if (!result.success) {
@@ -194,5 +206,9 @@ Task<HttpResponsePtr> AccountController::updateCurrentUser(HttpRequestPtr req) {
     Json::Value root;
     root["status"] = "success";
     root["data"] = toJson(result.data);
+    if (previous.success)
+        writeChangeAudit(req, "SỬA HỒ SƠ", "account:" + currentUsername,
+                         toJson(previous.data), toJson(result.data),
+                         {"email", "phone_number", "full_name", "avatar_url", "date_of_birth"});
     co_return HttpResponse::newHttpJsonResponse(root);
 }

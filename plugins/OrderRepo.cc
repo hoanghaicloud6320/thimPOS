@@ -73,12 +73,15 @@ drogon::Task<std::optional<Order>> OrderRepo::getOrder(int64_t id)
     co_return o;
 }
 
-drogon::Task<std::vector<Order>> OrderRepo::listOrders(int limit, int offset) 
+drogon::Task<std::vector<Order>> OrderRepo::listOrders(int limit, int offset,
+                                                       std::optional<int64_t> from,
+                                                       std::optional<int64_t> to)
 {
-    auto result = co_await db_->execSqlCoro(
-        "SELECT * FROM orders ORDER BY id DESC LIMIT $1 OFFSET $2",
-        limit, offset
-    );
+    std::string sql = "SELECT * FROM orders WHERE 1=1";
+    if (from) sql += " AND created_at >= " + std::to_string(*from);
+    if (to) sql += " AND created_at <= " + std::to_string(*to);
+    sql += " ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?";
+    auto result = co_await db_->execSqlCoro(sql, limit, offset);
 
     std::vector<Order> orders;
 

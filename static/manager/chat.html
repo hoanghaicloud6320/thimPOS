@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat với thimAI</title>
+<style>
+.chat-page{min-height:calc(100vh - 72px);padding:20px;color:var(--tp-text);display:flex;justify-content:center}.chat-card{width:min(980px,100%);height:calc(100vh - 112px);display:flex;flex-direction:column;overflow:hidden;border:1px solid rgba(129,140,248,.25);border-radius:20px;background:var(--tp-panel);box-shadow:0 20px 70px rgba(2,6,23,.3)}.chat-head{padding:16px 20px;border-bottom:1px solid rgba(148,163,184,.14);display:flex;align-items:center;justify-content:space-between}.chat-title{font-size:18px;font-weight:750}.chat-subtitle{margin-top:3px;color:var(--tp-muted);font-size:13px}.clear-btn,.send-btn,.suggestion{border:0;border-radius:10px;color:white;cursor:pointer}.clear-btn{padding:8px 12px;background:#334155}.context{padding:12px 18px;border-bottom:1px solid rgba(148,163,184,.14);display:grid;gap:10px;background:rgba(15,23,42,.35)}.context-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.context-label{font-size:12px;color:var(--tp-muted);font-weight:700;text-transform:uppercase;letter-spacing:.04em}.link-option{display:flex;align-items:center;gap:7px;padding:7px 10px;border:1px solid #334155;border-radius:10px;background:#0f172a;font-size:13px;cursor:pointer}.link-option:has(input:checked){border-color:#818cf8;background:rgba(99,102,241,.13)}.link-option input{accent-color:#6366f1}.date-field{display:flex;align-items:center;gap:6px;font-size:13px}.date-field input{padding:7px 9px;border:1px solid #334155;border-radius:9px;background:#0f172a;color:white}.context-note{color:var(--tp-muted);font-size:12px}.suggestions{display:flex;gap:8px;overflow:auto;padding:10px 18px;border-bottom:1px solid rgba(148,163,184,.1)}.suggestion{flex:none;padding:8px 11px;background:#273449;color:#cbd5e1;font-size:12px}.suggestion:hover{background:#37475f}.messages{flex:1;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:15px}.empty{margin:auto;text-align:center;color:var(--tp-muted);line-height:1.6}.message{max-width:82%;padding:12px 15px;border-radius:16px;white-space:pre-wrap;line-height:1.55}.message.user{align-self:flex-end;background:#6366f1;color:white;border-bottom-right-radius:5px}.message.assistant{align-self:flex-start;background:#1e293b;border-bottom-left-radius:5px}.message.error{align-self:center;max-width:90%;background:rgba(220,38,38,.16);color:#fca5a5;border:1px solid rgba(248,113,113,.25)}.message.status{align-self:center;background:transparent;color:var(--tp-muted);font-size:12px}.composer{padding:14px 16px;border-top:1px solid rgba(148,163,184,.14);display:flex;gap:10px}.composer textarea{flex:1;resize:none;min-height:46px;max-height:140px;padding:12px 14px;border:1px solid #334155;border-radius:12px;background:#0f172a;color:white;font:inherit}.send-btn{min-width:90px;padding:0 18px;background:linear-gradient(135deg,#7c3aed,#4f46e5);font-weight:700}.send-btn:disabled{opacity:.55;cursor:wait}@media(max-width:650px){.chat-page{padding:8px}.chat-card{height:calc(100vh - 88px)}.message{max-width:92%}.clear-btn{font-size:0}.clear-btn::after{content:'Xóa';font-size:13px}.context{max-height:180px;overflow:auto}.date-field{width:100%}}
+.message.assistant{white-space:normal}.message.assistant>:first-child{margin-top:0}.message.assistant>:last-child{margin-bottom:0}.message.assistant h1,.message.assistant h2,.message.assistant h3{margin:1em 0 .45em;line-height:1.25}.message.assistant h1{font-size:1.4em}.message.assistant h2{font-size:1.25em}.message.assistant h3{font-size:1.1em}.message.assistant p{margin:.65em 0}.message.assistant ul,.message.assistant ol{margin:.6em 0;padding-left:1.5em}.message.assistant blockquote{margin:.7em 0;padding:.2em 0 .2em 12px;border-left:3px solid #818cf8;color:#cbd5e1}.message.assistant code{padding:.12em .35em;border-radius:5px;background:#0f172a;color:#c4b5fd}.message.assistant pre{overflow:auto;padding:12px;border-radius:10px;background:#020617}.message.assistant pre code{padding:0;background:none;color:#e2e8f0}.message.assistant table{display:block;max-width:100%;overflow:auto;border-collapse:collapse;margin:.8em 0}.message.assistant th,.message.assistant td{padding:7px 9px;border:1px solid #475569;text-align:left}.message.assistant th{background:#0f172a}.message.assistant a{color:#a5b4fc}
+</style>
+</head>
+<body>
+<main class="chat-page">
+  <section class="chat-card">
+    <header class="chat-head">
+      <div><div class="chat-title">✦ thimAI</div><div class="chat-subtitle">Trợ lý phân tích kinh doanh của ThimPOS</div></div>
+      <button class="clear-btn" id="clear" type="button">Cuộc trò chuyện mới</button>
+    </header>
+    <section class="context" id="contextPanel">
+      <div class="context-row">
+        <span class="context-label">Link data</span>
+        <label class="link-option"><input id="linkOrders" type="checkbox"> Link orders data</label>
+        <label class="link-option"><input id="linkInventory" type="checkbox"> Link inventory data</label>
+        <label class="link-option"><input id="linkProducts" type="checkbox"> Link products data</label>
+      </div>
+      <div class="context-row">
+        <span class="context-label">Khoảng thời gian</span>
+        <label class="date-field">Từ <input id="dateFrom" type="date"></label>
+        <label class="date-field">Đến <input id="dateTo" type="date"></label>
+        <span class="context-note">Dữ liệu đã chọn được nạp một lần vào đầu conversation.</span>
+      </div>
+    </section>
+    <div class="suggestions">
+      <button class="suggestion" type="button">Hãy lập báo cáo tổng quan theo các cực: món bán chạy nhất, món không bán được, nguyên liệu đang thừa nhiều nhất, nguyên liệu đang thiếu hoặc sắp thiếu, lô sắp hết hạn, lô còn hạn dài, cùng các bất thường đáng chú ý. Nêu số liệu, lý do và hành động đề xuất cho từng mục.</button>
+      <button class="suggestion" type="button">Món nào bán chạy nhất và món nào không bán được?</button>
+      <button class="suggestion" type="button">Món nào hay thừa hoặc thiếu nguyên liệu?</button>
+      <button class="suggestion" type="button">Phân tích tình hình kinh doanh trong kỳ này</button>
+      <button class="suggestion" type="button">Đề xuất việc cần ưu tiên tuần tới</button>
+    </div>
+    <div class="messages" id="messages"><div class="empty" id="empty">Chọn dữ liệu muốn liên kết hoặc hỏi thimAI ngay.<br>Mặc định khoảng thời gian là từ đầu tháng đến hôm nay.</div></div>
+    <form class="composer" id="composer">
+      <textarea id="input" placeholder="Hỏi thimAI về tình hình kinh doanh…" required></textarea>
+      <button class="send-btn" id="send" type="submit">Gửi</button>
+    </form>
+  </section>
+</main>
+<link rel="stylesheet" href="/thimpos.css">
+<script src="/thimpos.js" defer></script>
+<script>
+const history=[];
+let contextLinked=false;
+const messages=document.getElementById('messages');
+const input=document.getElementById('input');
+const send=document.getElementById('send');
+const pad=value=>String(value).padStart(2,'0');
+const localDate=value=>`${value.getFullYear()}-${pad(value.getMonth()+1)}-${pad(value.getDate())}`;
+const now=new Date();
+document.getElementById('dateFrom').value=localDate(new Date(now.getFullYear(),now.getMonth(),1));
+document.getElementById('dateTo').value=localDate(now);
+
+function escapeHtml(value){return String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]))}
+function inlineMarkdown(value){return value.replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>').replace(/__([^_]+)__/g,'<strong>$1</strong>').replace(/\*([^*]+)\*/g,'<em>$1</em>').replace(/_([^_]+)_/g,'<em>$1</em>').replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')}
+function markdownToHtml(markdown){const source=escapeHtml(markdown).replace(/\r\n?/g,'\n');const codeBlocks=[];const text=source.replace(/```([^\n]*)\n([\s\S]*?)```/g,(_,language,code)=>{const token=`@@CODEBLOCK${codeBlocks.length}@@`;codeBlocks.push(`<pre><code data-language="${language.trim()}">${code.replace(/^\n|\n$/g,'')}</code></pre>`);return token});const lines=text.split('\n');const output=[];let list=null;const closeList=()=>{if(list){output.push(`</${list}>`);list=null}};for(let index=0;index<lines.length;index++){const line=lines[index];if(/^@@CODEBLOCK\d+@@$/.test(line)){closeList();output.push(line);continue}if(/^\|.*\|$/.test(line)&&index+1<lines.length&&/^\|?\s*:?-{3,}/.test(lines[index+1])){closeList();const headers=line.split('|').slice(1,-1).map(cell=>cell.trim());index+=2;const rows=[];while(index<lines.length&&/^\|.*\|$/.test(lines[index])){rows.push(lines[index].split('|').slice(1,-1).map(cell=>cell.trim()));index++}index--;output.push(`<table><thead><tr>${headers.map(cell=>`<th>${inlineMarkdown(cell)}</th>`).join('')}</tr></thead><tbody>${rows.map(row=>`<tr>${row.map(cell=>`<td>${inlineMarkdown(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table>`);continue}const heading=line.match(/^(#{1,3})\s+(.+)$/);if(heading){closeList();output.push(`<h${heading[1].length}>${inlineMarkdown(heading[2])}</h${heading[1].length}>`);continue}const bullet=line.match(/^\s*[-*+]\s+(.+)$/);const numbered=line.match(/^\s*\d+[.)]\s+(.+)$/);if(bullet||numbered){const type=bullet?'ul':'ol';if(list!==type){closeList();list=type;output.push(`<${type}>`)}output.push(`<li>${inlineMarkdown((bullet||numbered)[1])}</li>`);continue}closeList();if(!line.trim())continue;if(line.startsWith('&gt; '))output.push(`<blockquote>${inlineMarkdown(line.slice(5))}</blockquote>`);else output.push(`<p>${inlineMarkdown(line)}</p>`)}closeList();return output.join('').replace(/@@CODEBLOCK(\d+)@@/g,(_,id)=>codeBlocks[Number(id)])}
+function addMessage(role,content){document.getElementById('empty')?.remove();const node=document.createElement('div');node.className=`message ${role}`;if(role==='assistant')node.innerHTML=markdownToHtml(content);else node.textContent=content;messages.appendChild(node);messages.scrollTop=messages.scrollHeight;return node}
+function epoch(id,endOfDay=false){const value=document.getElementById(id).value;if(!value)return null;const suffix=endOfDay?'T23:59:59':'T00:00:00';return Math.floor(new Date(value+suffix).getTime()/1000)}
+async function getJson(url){const response=await fetch(url);const body=await response.json().catch(()=>null);if(!response.ok)throw new Error(body?.message||body?.error?.message||body?.error||`Không tải được dữ liệu (${response.status})`);return body}
+async function collectPages(makeUrl,extract=value=>value.items||value.data||[]){const rows=[];const limit=500;for(let offset=0;;offset+=limit){const body=await getJson(makeUrl(limit,offset));const page=extract(body);rows.push(...page);if(page.length<limit)break;if(rows.length>=10000)throw new Error('Dữ liệu vượt quá 10.000 dòng. Hãy thu hẹp khoảng thời gian.')}return rows}
+async function buildLinkedContext(){const from=epoch('dateFrom');const to=epoch('dateTo',true);if(from===null||to===null||from>to)throw new Error('Khoảng thời gian không hợp lệ.');const blocks=[];if(document.getElementById('linkOrders').checked){const orders=await collectPages((limit,offset)=>`/api/orders?from=${from}&to=${to}&include_items=true&limit=${limit}&offset=${offset}`,value=>value.items||[]);blocks.push({type:'orders',from,to,rows:orders})}if(document.getElementById('linkInventory').checked){const [items,lots,movements,recipes]=await Promise.all([collectPages((limit,offset)=>`/api/inventory/items?limit=${limit}&offset=${offset}`),collectPages((limit,offset)=>`/api/inventory/lots?from=${from}&to=${to}&limit=${limit}&offset=${offset}`),collectPages((limit,offset)=>`/api/inventory/movements?from=${from}&to=${to}&limit=${limit}&offset=${offset}`),collectPages((limit,offset)=>`/api/inventory/recipes?limit=${limit}&offset=${offset}`)]);blocks.push({type:'inventory',from,to,items,lots,movements,recipes})}if(document.getElementById('linkProducts').checked){const products=await collectPages((limit,offset)=>`/api/products?limit=${limit}&offset=${offset}&active_only=false`);blocks.push({type:'products',rows:products})}const serialized=JSON.stringify(blocks);if(serialized.length>80000)throw new Error('Dữ liệu liên kết quá lớn cho một lượt AI. Hãy thu hẹp khoảng thời gian hoặc bớt loại dữ liệu.');return serialized}
+function resetConversation(){history.length=0;contextLinked=false;messages.innerHTML='<div class="empty" id="empty">Cuộc trò chuyện mới đã sẵn sàng.</div>';document.querySelectorAll('#contextPanel input').forEach(element=>element.disabled=false);input.focus()}
+document.getElementById('clear').addEventListener('click',resetConversation);
+document.querySelectorAll('.suggestion').forEach(button=>button.addEventListener('click',()=>{input.value=button.textContent.trim();input.focus()}));
+input.addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();document.getElementById('composer').requestSubmit()}});
+document.getElementById('composer').addEventListener('submit',async event=>{event.preventDefault();const content=input.value.trim();if(!content||send.disabled)return;send.disabled=true;send.textContent='Đang gửi…';let status;try{let finalContent=content;if(!contextLinked){const wantsData=['linkOrders','linkInventory','linkProducts'].some(id=>document.getElementById(id).checked);if(wantsData){status=addMessage('status','Đang tổng hợp dữ liệu đã liên kết…');const linked=await buildLinkedContext();finalContent=`${content}\n\n[DỮ LIỆU THIMPOS ĐƯỢC LIÊN KẾT CHO CONVERSATION NÀY]\n${linked}`;status.remove()}contextLinked=true;document.querySelectorAll('#contextPanel input').forEach(element=>element.disabled=true)}history.push({role:'user',content:finalContent});addMessage('user',content);input.value='';const response=await fetch('/api/ai/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:history})});const body=await response.json().catch(()=>null);if(!response.ok||!body?.success)throw new Error(body?.error?.message||`Yêu cầu thất bại (${response.status})`);const reply=body.data.message;history.push({role:'assistant',content:reply.content});addMessage('assistant',reply.content)}catch(error){status?.remove();addMessage('error',error.message)}finally{send.disabled=false;send.textContent='Gửi';input.focus()}});
+</script>
+</body>
+</html>

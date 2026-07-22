@@ -253,7 +253,18 @@ VerifiedLicense verifySignedLicense(const Json::Value &file,
         throw std::runtime_error("OFFLINE_CACHE_EXPIRED");
     if (offlineUntil > issuedAt + kMaximumOfflineWindow)
         throw std::runtime_error("OFFLINE_WINDOW_INVALID");
-    return {payload["registrant_name"].asString(), payload["expires_at"].asString()};
+    std::unordered_map<std::string, std::string> metadata;
+    const auto &metadataJson = payload["metadata"];
+    if (metadataJson.isObject())
+    {
+        for (const auto &name : metadataJson.getMemberNames())
+        {
+            if (metadataJson[name].isString())
+                metadata.emplace(name, metadataJson[name].asString());
+        }
+    }
+    return {payload["registrant_name"].asString(), payload["expires_at"].asString(),
+            std::move(metadata)};
 }
 
 HttpResult postJson(const std::string &apiUrl,
