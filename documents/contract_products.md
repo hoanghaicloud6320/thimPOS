@@ -1,4 +1,4 @@
-# 📦 THIMPOS – PRODUCT API CONTRACT (v1.4)
+# 📦 THIMPOS – PRODUCT API CONTRACT
 
 **Base path**: "/api/products"
 
@@ -70,7 +70,7 @@ co_await svc.createProduct(name, price, description, image_url, category);
 
 ### Require Role
 
-* `manager`, `staff`, `""`
+* Public (no authentication filter)
 
 ### Query params
 
@@ -111,7 +111,7 @@ co_await svc.getProductById(id, active_only);
 
 ### Require Role
 
-* `manager`, `staff`, `""`
+* Public (no authentication filter)
 
 ### Query params
 
@@ -157,7 +157,7 @@ co_await svc.listProducts(limit, offset, active_only);
 
 ### Require Role
 
-* `manager`, `staff`, `""`
+* Public (no authentication filter)
 
 ### Query params
 
@@ -302,8 +302,8 @@ co_await svc.deleteProduct(id);
 | Endpoint                  | manager | staff | "" |
 | ------------------------- | ------- | ----- | -- |
 | POST /api/products        | ✔       | ✖     | ✖  |
-| GET /api/products/{id}    | ✔       | ✔     | ✔  |
-| GET /api/products         | ✔       | ✔     | ✔  |
-| GET /api/products/search  | ✔       | ✔     | ✔  |
+| GET /api/products/{id}    | ✔       | ✔     | ✔ (public) |
+| GET /api/products         | ✔       | ✔     | ✔ (public) |
+| GET /api/products/search  | ✔       | ✔     | ✔ (public) |
 | PUT /api/products/{id}    | ✔       | ✖     | ✖  |
 | DELETE /api/products/{id} | ✔       | ✖     | ✖  |

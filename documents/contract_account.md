@@ -13,7 +13,7 @@
 | `avatar_url` | String | Đường dẫn ảnh đại diện |
 | `date_of_birth` | String | Ngày sinh (ISO8601: YYYY-MM-DD) |
 | `created_at` | Timestamp | Thời điểm tạo tài khoản |
-| `updated_at` | Timestamp | Thời điểm cập nhật cuối cùng |
+| `updated_at` | Timestamp | Có trong persistence nội bộ; API hiện không serialize field này |
 
 ### Roles Definition
 - **manager**: Có toàn quyền quản lý hệ thống và quản lý các tài khoản khác.

@@ -1,171 +1,186 @@
-# 🧩 ThimPOS v1.4 — Mini Spec
+# ThimPOS — Current System Specification
 
-## 1. 🎯 Mục tiêu
+This document describes the complete system represented by the current source.
+Endpoint-level request and response details are frozen in the `contract_*.md`
+documents.
 
-Hệ POS tối giản cho shop nhỏ:
+## 1. Product scope
 
-* Quản lý sản phẩm (danh mục cơ bản)
-* Quản lý đơn hàng (record + in bill)
-* Admin thao tác DB + web mức nhẹ
+ThimPOS is a Windows-oriented point-of-sale server and browser UI for a small
+shop. It provides:
 
-Không xử lý tồn kho, không analytics phức tạp.
+- public product browsing and manager product maintenance;
+- authenticated order entry, replacement, deletion and bill printing;
+- separate credential/session and account/profile management;
+- manager-only inventory, purchase lots, recipes and movement ledger;
+- manager-only AI-assisted business reports using license-provided Gemini
+  configuration;
+- authenticated shared file library with public static file URLs;
+- change audit logging for selected business mutations;
+- cloud license validation before the application starts serving.
 
----
+The application uses SQLite by default and serves its web UI and static assets
+through Drogon.
 
-## 2. 🧱 Kiến trúc tổng thể
+## 2. Architecture and boundaries
 
-### Pattern chính
-* AuthNFilter
-* AuthZFilter
-* http/ws contnroller (gọi service để thỏa mãn http contract. Controller tự quyết định các Filter phía trước)
+The normal request flow is:
 
-* **Plugin = Service (1:1)**
-* Service giữ logic + repo
-* Repo làm việc trực tiếp DB (SQL raw)
-* Không ORM, không callback nếu coroutine dùng được
+```text
+HTTP request
+  -> AuthNFilter (when required: resolve sid to username)
+  -> AuthZFilter (when required: resolve account role)
+  -> Controller (HTTP validation and response contract)
+  -> Plugin/Service (business rules and orchestration)
+  -> Repository or filesystem/provider adapter
+```
 
-### Nguyên tắc thiết kế
+Design rules:
 
-* Header = contract + doc (đóng băng interface)
-* Không virtual → tránh overhead + complexity
-* Repo truy cập DB trực tiếp qua `app().getDbClient()`
-* Plugin tự quản lý schema của mình (auto-create table)
-* Tránh coupling ngang, chỉ phụ thuộc qua plugin interface
+- A Drogon plugin is the public service boundary for a domain.
+- Controllers select filters and implement the HTTP contract.
+- Services own validation, orchestration and domain behavior.
+- Repositories use Drogon's database client and raw SQL; there is no ORM layer.
+- SQLite and the filesystem are local sources of truth.
+- Coroutine APIs are preferred where the underlying interface supports them.
+- Credentials and accounts are deliberately separate records and are not
+  implicitly synchronized.
 
----
+## 3. Modules
 
-## 3. 🧩 Module Breakdown
+### Products
 
-### 3.1📦 Product Domain
+`ProductManagerController` exposes public read/list/search endpoints and
+manager-only create/update/soft-delete endpoints. `ProductManagerService` owns
+validation; `ProductRepo` owns the `products` table. Prices are integer minor
+units (VND in the bundled UI), and deletion sets `is_active = false`.
 
-#### ProductManagerService
+Contract: [contract_products.md](contract_products.md).
 
-* CRUD sản phẩm
-* Validate dữ liệu cơ bản
-* Entry point cho domain products
+### Orders and printing
 
-#### ProductRepo
+`OrderController` permits `manager` and `staff` accounts to create, read,
+list, fully replace and delete orders. `OrderService` coordinates
+`OrderRepo` and inventory synchronization. Order items store unit-price
+snapshots so later product price changes do not rewrite sales totals.
 
-* Quản lý bảng `products`
-* SQL thuần
-* Tự tạo bảng nếu chưa tồn tại
+`BillPrintController` renders an existing order using
+`bills/activeTemplate.tpl`, saves a text bill and delegates printing to
+`TxtPrinterService`.
 
----
+Contract: [contract_orders.md](contract_orders.md).
 
-### 3.2 🧾 Order Domain
+### Inventory
 
-#### OrderService
+`InventoryController` is manager-only. `InventoryService` and `InventoryRepo`
+manage inventory items, purchase lots, product recipes and an append-oriented
+movement ledger. On-hand values are sums of movements. Order create, replace
+and delete operations create or reconcile recipe-based movements.
 
-* Tạo / sửa / xóa đơn
-* Gắn product vào order
-* Generate nội dung bill
-* Gọi TxtPrinterService để in
+Contract: [contract_inventory.md](contract_inventory.md).
 
-#### OrderRepo
+### Authentication and accounts
 
-* Quản lý:
+`AuthNService` manages credentials and multi-device sessions in
+`credentials` and `sessions`. The `sid` cookie is the authentication token.
+`AuthNFilter` validates it and attaches `username`.
 
-  * `orders`
-  * `order_items`
-* Mapping đơn ↔ sản phẩm (1-n)
+`AccountManagementService` manages profile and role data in `accounts`.
+`AuthZFilter` resolves the authenticated username to an account and attaches
+its role. A valid credential without a corresponding account can authenticate
+but cannot pass authorization.
 
----
+Contracts: [contract_authn.md](contract_authn.md) and
+[contract_account.md](contract_account.md).
 
-### 3.3 🖨 TxtPrinter Domain
+### AI
 
-#### TxtPrinterService
+`AiController` is manager-only and stateless. `AiService` sends the supplied
+message history to Gemini. API key and model are read from verified license
+metadata, never accepted from the HTTP request. The browser assembles sales and
+inventory context using existing APIs.
 
-* Ghi string → file `.txt`
-* Gửi lệnh in (qua system command)
+Contract: [contract_ai.md](contract_ai.md).
 
-Cực mỏng, không chứa business logic.
+### Shared file library
 
-### 3.4 Account Management Domain
-#### AccountManagementService
-* CRUD account: tạo, sửa, xóa, phân quyền
-* lưu ý: ko quan tâm đến credentials
-#### AccountRepo
-* Quản lý bảng: `accounts`
+`LibraryService` stores files under `static/user_library_files`, makes upload
+names safe and collision-free, and reads metadata directly from the filesystem.
+Authenticated users can list, upload and delete; the resulting static URLs are
+public by design.
 
-### 3.5 AuthN (AuthN/credentials only)
-#### AuthNService
-* CRUD credentials
-* sessions manage
-#### AuthNRepo
-* Quản lý bảng: `credentials`, `sessions`
+Contract: [contract_library.md](contract_library.md).
 
-### 3.6 Library Domain
+### Audit log
 
-#### LibraryService
+Change-audit helpers record selected successful update/delete operations with
+the actor, target, before/after values and whitelisted changed fields. Read-only
+requests and failed authentication attempts are not change-audited.
 
-* Quản lý thư viện file dùng chung trên filesystem
-* Lưu file tại `static/user_library_files`
-* Liệt kê metadata, upload với tên không trùng và xóa file
-* Không dùng database và không lưu ownership
+Details: [audit_logging.md](audit_logging.md).
 
-#### LibraryController
+### Licensing
 
-* API quản lý tại `/api/library/files`
-* Yêu cầu đăng nhập bằng `AuthNFilter`
-* Manager và staff có cùng quyền xem, upload và xóa
-* URL `/user_library_files/{name}` là static URL công khai, không qua controller
+`KeyManagerClient` validates activation with the cloud KeyManager before normal
+startup. Release builds use the Windows native trust store for HTTPS and must
+pass a fresh activation test from the packaged directory.
 
-#### Library UI
+Details: [license_check.md](license_check.md).
 
-* File explorer tại `/manager/files_library.html`
-* Hỗ trợ upload nhiều file, kéo-thả, tìm kiếm, copy link và xóa
+## 4. Access model
 
----
+| Area | Public | Authenticated staff | Manager |
+|---|---:|---:|---:|
+| Product read/list/search | Yes | Yes | Yes |
+| Product create/update/delete | No | No | Yes |
+| Orders and bill printing | No | Yes | Yes |
+| Personal profile read | No | Yes | Yes |
+| Personal profile update | No | No | Yes |
+| Account/credential administration | No | No | Yes |
+| Inventory and movement data | No | No | Yes |
+| AI generation | No | No | Yes |
+| File library management | No | Yes | Yes |
+| Library static URLs | Yes, with URL | Yes | Yes |
 
-## 4. 🗄 Database
+## 5. Persistence
 
-### SQLite (default DB)
-schema: xem trong schema.sql
+SQLite is configured in `config.json`. Tables are initialized by their owning
+plugins and are also summarized in `schema.sql`. Principal groups are:
 
----
+- `products`;
+- `orders`, `order_items`;
+- `credentials`, `sessions`;
+- `accounts`;
+- inventory items, lots, recipes and movements.
 
-## 5. 🔗 Dependency Graph (Plugin Level)
+Runtime data such as `csdl.sqlite3`, logs, generated bills, uploaded user files
+and license cache are not source artifacts and must not be bundled into a clean
+release unless explicitly listed by the release checklist.
 
-### Giải thích
+## 6. Configuration and external dependencies
 
-* **OrderService**
+- Drogon/Trantor: HTTP server, filters, plugins and database integration.
+- SQLite: application persistence.
+- JsonCpp: JSON handling.
+- curl/OpenSSL: cloud license and provider HTTP calls.
+- Gemini: AI provider, configured only through verified license metadata.
+- Windows printing: `TxtPrinterService` invokes the platform print command.
 
-  * cần ProductManagerService → để resolve product
-  * cần TxtPrinterService → để in bill
-* **ProductManagerService**
+`config.json` defines listeners, database, static files, upload limits, plugins
+and service-specific settings. Secrets issued through licensing are not stored
+in the public browser configuration.
 
-  * độc lập (leaf)
-* **TxtPrinterService**
+## 7. Release invariants
 
-  * độc lập (leaf)
-* **AccountManagementService** (leaf)
-* AuthNService (leaf)
-* **LibraryService** (leaf, chỉ phụ thuộc filesystem)
+A public Windows release must:
 
----
+- be built from the tagged source commit with the documented static toolchain;
+- depend only on Windows system DLLs;
+- contain clean configuration, UI/static assets, bill template and end-user
+  documentation, but no database, logs, generated bills or license cache;
+- pass fresh cloud activation and HTTP startup checks from the packaged folder;
+- ship as a versioned ZIP plus matching SHA-256 file;
+- use an annotated tag that points to the released commit.
 
-## 6. ⚙️ Plugin Config Notes
-
-* OrderService:
-
-  * giữ template bill (tpl file)
-  * không hardcode format
-
-## 6.1 Auth note:
-* cần phân biệt rõ ràng giữa Account và Credentials, vì trong hệ thống này 2 thứ này ko sync với nhau
-* AuthN chỉ để kiểm tra credentials - tức là cặp (username,password), và sessions. credentials ko phải tài khoản, nó là khóa
-* AccountManagementService chỉ kiểm soát Account, ko lo về credentials
-
-* về phần các filter:
- + AuthNFilter sẽ chỉ đơn giản là gọi AuthNService để gán `username` vào request. nếu ko có sid thì sẽ 401
- + AuthZFilter sẽ phụ thuộc vào `username` mà AuthNFilter đã gán, sau đó hỏi AccountManagementService và gán `role`. nếu ko có tài khoản thì sẽ bị 403
-
-* **hệ quả:** ta ko nên truth AuthN. có thể đã login nhưng credential đó ko ứng với account nào cả. và ngược lại, dù có account nhưng ko có credential thì cũng ko login được
----
-
-## 7. 🧠 Triết lý v0.1
-
-* “Ship first, polish later”
-* Tối giản abstraction nhưng giữ boundary rõ
-* DB là source of truth, không layer hóa quá mức
-* Service có thể tự vận hành độc lập
+The authoritative procedure is
+[READ_THIS_BEFORE_BUILDING_RELEASE_ASSETS.md](../READ_THIS_BEFORE_BUILDING_RELEASE_ASSETS.md).

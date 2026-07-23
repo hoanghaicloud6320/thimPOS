@@ -1,4 +1,4 @@
-# 📦 THIMPOS – ORDER API CONTRACT (v1.4)
+# 📦 THIMPOS – ORDER API CONTRACT
 
 Base path:
 
@@ -188,7 +188,10 @@ Optional query parameters:
 
 ---
 
-👉 Không include items (để nhẹ query)
+Mặc định `include_items=false` để response nhẹ. Khi
+`include_items=true`, mỗi phần tử có thêm mảng `items` theo cùng shape với
+order detail. Response đồng thời echo `from`, `to` (nếu có) và
+`include_items`.
 
 ---
 
