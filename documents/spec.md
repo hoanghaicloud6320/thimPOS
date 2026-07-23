@@ -94,6 +94,27 @@ Cực mỏng, không chứa business logic.
 #### AuthNRepo
 * Quản lý bảng: `credentials`, `sessions`
 
+### 3.6 Library Domain
+
+#### LibraryService
+
+* Quản lý thư viện file dùng chung trên filesystem
+* Lưu file tại `static/user_library_files`
+* Liệt kê metadata, upload với tên không trùng và xóa file
+* Không dùng database và không lưu ownership
+
+#### LibraryController
+
+* API quản lý tại `/api/library/files`
+* Yêu cầu đăng nhập bằng `AuthNFilter`
+* Manager và staff có cùng quyền xem, upload và xóa
+* URL `/user_library_files/{name}` là static URL công khai, không qua controller
+
+#### Library UI
+
+* File explorer tại `/manager/files_library.html`
+* Hỗ trợ upload nhiều file, kéo-thả, tìm kiếm, copy link và xóa
+
 ---
 
 ## 4. 🗄 Database
@@ -119,6 +140,7 @@ schema: xem trong schema.sql
   * độc lập (leaf)
 * **AccountManagementService** (leaf)
 * AuthNService (leaf)
+* **LibraryService** (leaf, chỉ phụ thuộc filesystem)
 
 ---
 

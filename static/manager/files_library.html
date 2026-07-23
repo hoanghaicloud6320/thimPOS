@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ThimPOS - Thư viện file</title>
+<style>
+.library-page{padding:24px;color:var(--tp-text);font-family:system-ui,-apple-system,sans-serif}.library-header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px}.library-header h1{font-size:25px;margin:0}.library-header p{color:var(--tp-muted);margin:5px 0 0}.upload-button,.action-button{border:0;border-radius:9px;color:#fff;cursor:pointer;font-weight:600}.upload-button{background:var(--tp-active);padding:11px 17px;white-space:nowrap}.toolbar{display:flex;gap:10px;background:var(--tp-panel);padding:12px;border-radius:12px;margin-bottom:14px}.search{flex:1;min-width:0;background:#1e293b;color:#fff;border:1px solid #334155;border-radius:8px;padding:10px 12px}.drop-zone{border:2px dashed #475569;border-radius:12px;padding:28px;text-align:center;color:var(--tp-muted);margin-bottom:14px;transition:.2s}.drop-zone.dragging{border-color:#60a5fa;background:#172554;color:#dbeafe}.file-panel{background:var(--tp-panel);border-radius:12px;overflow:hidden}.file-row{display:grid;grid-template-columns:minmax(220px,1fr) 110px 170px 220px;gap:12px;align-items:center;padding:13px 16px;border-bottom:1px solid #263244}.file-row:last-child{border-bottom:0}.file-row.header{color:var(--tp-muted);font-size:12px;text-transform:uppercase;font-weight:700}.file-name{display:flex;align-items:center;gap:11px;min-width:0}.file-icon{font-size:25px}.name-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#bfdbfe}.actions{display:flex;gap:7px}.action-button{padding:8px 10px;background:#334155}.action-button.copy{background:#2563eb}.action-button.delete{background:#991b1b}.empty{padding:50px 20px;text-align:center;color:var(--tp-muted)}.progress{display:none;color:#bfdbfe;padding:8px 2px}.toast{position:fixed;right:20px;bottom:20px;background:#166534;color:#fff;padding:11px 15px;border-radius:9px;z-index:2000;box-shadow:0 8px 30px #0008}.toast.error{background:#991b1b}.tp-main{background:#0f172a}@media(max-width:780px){.library-page{padding:15px}.library-header{align-items:flex-start}.file-row{grid-template-columns:minmax(0,1fr) auto}.file-row.header{display:none}.file-row .size,.file-row .date{display:none}.actions{justify-content:flex-end}.action-button span{display:none}}
+</style>
+</head>
+<body>
+<main class="library-page">
+  <div class="library-header">
+    <div><h1>📁 Thư viện file</h1><p>Tải file lên một lần, dùng đường dẫn ở mọi nơi trong hệ thống.</p></div>
+    <button class="upload-button" id="chooseButton">＋ Tải file lên</button>
+    <input id="fileInput" type="file" multiple hidden>
+  </div>
+  <div class="toolbar"><input class="search" id="searchInput" type="search" placeholder="Tìm theo tên file…"></div>
+  <div class="drop-zone" id="dropZone">Kéo và thả file vào đây, hoặc bấm “Tải file lên”</div>
+  <div class="progress" id="progress">Đang tải file lên…</div>
+  <section class="file-panel">
+    <div class="file-row header"><div>Tên file</div><div>Kích thước</div><div>Cập nhật</div><div>Thao tác</div></div>
+    <div id="fileList"><div class="empty">Đang đọc thư viện…</div></div>
+  </section>
+</main>
+<script>
+const API="/api/library/files";let libraryFiles=[];const list=document.getElementById("fileList"),input=document.getElementById("fileInput"),progress=document.getElementById("progress");
+function escapeHtml(value){return String(value).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function icon(name){const ext=name.split(".").pop().toLowerCase();if(["png","jpg","jpeg","gif","webp","svg"].includes(ext))return"🖼️";if(ext==="pdf")return"📕";if(["xls","xlsx","csv"].includes(ext))return"📊";if(["doc","docx","txt"].includes(ext))return"📄";if(["zip","rar","7z"].includes(ext))return"🗜️";return"📎"}
+function formatSize(bytes){if(!bytes)return"0 B";const units=["B","KB","MB","GB"],i=Math.min(Math.floor(Math.log(bytes)/Math.log(1024)),3);return`${(bytes/Math.pow(1024,i)).toFixed(i?1:0)} ${units[i]}`}
+function notify(message,error=false){const el=document.createElement("div");el.className="toast"+(error?" error":"");el.textContent=message;document.body.appendChild(el);setTimeout(()=>el.remove(),2800)}
+function render(){const query=document.getElementById("searchInput").value.trim().toLowerCase(),files=libraryFiles.filter(f=>f.name.toLowerCase().includes(query));if(!files.length){list.innerHTML=`<div class="empty">${query?"Không tìm thấy file phù hợp.":"Thư viện đang trống. Hãy tải file đầu tiên lên nhé."}</div>`;return}list.innerHTML=files.map(f=>{const encoded=encodeURIComponent(f.name),url=f.url.split("/").slice(0,-1).join("/")+"/"+encoded;return`<div class="file-row"><div class="file-name"><span class="file-icon">${icon(f.name)}</span><a class="name-text" href="${escapeHtml(url)}" target="_blank" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</a></div><div class="size">${formatSize(f.size)}</div><div class="date">${new Date(f.modified_at*1000).toLocaleString("vi-VN")}</div><div class="actions"><button class="action-button copy" data-name="${escapeHtml(f.name)}">🔗 <span>Copy link</span></button><button class="action-button delete" data-name="${escapeHtml(f.name)}">🗑️ <span>Xóa</span></button></div></div>`}).join("")}
+async function loadFiles(){const response=await fetch(API,{credentials:"include"});if(response.status===401){location.href="/auth/login.html";return}const data=await response.json();if(!response.ok)throw new Error(data.error||"Không đọc được thư viện");libraryFiles=data.files||[];render()}
+async function uploadFiles(files){if(!files.length)return;const form=new FormData();[...files].forEach(file=>form.append("files",file));progress.style.display="block";try{const response=await fetch(API,{method:"POST",credentials:"include",body:form}),data=await response.json();if(!response.ok)throw new Error(data.error||"Tải file thất bại");notify(`Đã tải lên ${data.files.length} file`);await loadFiles()}catch(error){notify(error.message,true)}finally{progress.style.display="none";input.value=""}}
+async function copyLink(name){const url=`${location.origin}/user_library_files/${encodeURIComponent(name)}`;try{await navigator.clipboard.writeText(url);notify("Đã copy link vào clipboard")}catch{window.prompt("Copy đường dẫn này:",url)}}
+async function deleteFile(name){if(!confirm(`Xóa “${name}” khỏi thư viện? Các nơi đang dùng link này sẽ không còn mở được file.`))return;const response=await fetch(`${API}/${encodeURIComponent(name)}`,{method:"DELETE",credentials:"include"}),data=await response.json();if(!response.ok){notify(data.error||"Không thể xóa file",true);return}notify("Đã xóa file");await loadFiles()}
+document.getElementById("chooseButton").onclick=()=>input.click();input.onchange=()=>uploadFiles(input.files);document.getElementById("searchInput").oninput=render;list.onclick=e=>{const button=e.target.closest("button");if(!button)return;button.classList.contains("copy")?copyLink(button.dataset.name):deleteFile(button.dataset.name)};const drop=document.getElementById("dropZone");["dragenter","dragover"].forEach(event=>drop.addEventListener(event,e=>{e.preventDefault();drop.classList.add("dragging")}));["dragleave","drop"].forEach(event=>drop.addEventListener(event,e=>{e.preventDefault();drop.classList.remove("dragging")}));drop.addEventListener("drop",e=>uploadFiles(e.dataTransfer.files));loadFiles().catch(error=>{list.innerHTML=`<div class="empty">${escapeHtml(error.message)}</div>`;notify(error.message,true)});
+</script>
+<link rel="stylesheet" href="/thimpos.css">
+<script src="/thimpos.js" defer></script>
+</body>
+</html>

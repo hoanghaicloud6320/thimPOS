@@ -4,6 +4,7 @@
             name: "Quản lý",
             items: [
                 { label: "Sản phẩm", href: "/manager/products.html" },
+                { label: "Thư viện file", href: "/manager/files_library.html" },
                 { label: "Quản lý kho", href: "/manager/inventory.html" },
                 { label: "Báo cáo AI", href: "/manager/report.html" },
                 { label: "Chat với AI", href: "/manager/chat.html" },
