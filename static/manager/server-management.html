@@ -82,8 +82,6 @@ async function load(){
 }
 $('shutdown').addEventListener('click',async()=>{
  if(!confirm('Bạn chắc chắn muốn tắt máy chủ ThimPOS?'))return;
- const confirmation=prompt('Nhập TAT MAY CHU để xác nhận:');
- if(confirmation!=='TAT MAY CHU'){if(confirmation!==null)alert('Nội dung xác nhận không đúng.');return}
  const button=$('shutdown');button.disabled=true;button.textContent='Đang tắt…';
  try{
   const response=await fetch(api+'/shutdown',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirmation:'SHUTDOWN'})});

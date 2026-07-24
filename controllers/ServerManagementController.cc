@@ -26,6 +26,16 @@ HttpResponsePtr forbidden()
     return response(std::move(body), k403Forbidden);
 }
 
+HttpResponsePtr serviceUnavailable()
+{
+    Json::Value body;
+    body["success"] = false;
+    body["error"]["code"] = "SERVER_MANAGEMENT_UNAVAILABLE";
+    body["error"]["message"] =
+        "Server management service is not initialized.";
+    return response(std::move(body), k503ServiceUnavailable);
+}
+
 bool isManager(const HttpRequestPtr &request)
 {
     try
@@ -46,6 +56,9 @@ ServerManagementController::status(HttpRequestPtr request)
         co_return forbidden();
 
     const auto service = app().getPlugin<ServerManagementService>();
+    if (!service)
+        co_return serviceUnavailable();
+
     Json::Value body;
     body["success"] = true;
     body["data"] = service->status();
@@ -59,6 +72,9 @@ ServerManagementController::license(HttpRequestPtr request)
         co_return forbidden();
 
     const auto service = app().getPlugin<ServerManagementService>();
+    if (!service)
+        co_return serviceUnavailable();
+
     Json::Value body;
     body["success"] = true;
     body["data"] = service->licenseInfo();
@@ -89,6 +105,12 @@ void ServerManagementController::shutdown(
     }
 
     const auto service = app().getPlugin<ServerManagementService>();
+    if (!service)
+    {
+        callback(serviceUnavailable());
+        return;
+    }
+
     if (!service->beginShutdown())
     {
         Json::Value body;
