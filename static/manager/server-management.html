@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quản lý máy chủ</title>
+<style>
+.server-page{--surface:#fff;--soft:#f8fafc;--text:#172033;--muted:#64748b;--line:#dbe3ef;--green:#15803d;--red:#b91c1c;min-height:calc(100vh - 72px);padding:24px;color:var(--text)}.wrap{width:min(920px,100%);margin:auto}.head{margin-bottom:20px}.eyebrow{color:#5b4fd6;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.head h1{margin:7px 0 5px;font-size:clamp(28px,5vw,42px);letter-spacing:-.035em}.head p{margin:0;color:var(--muted)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.card{padding:22px;border:1px solid var(--line);border-radius:18px;background:var(--surface);box-shadow:0 12px 35px rgba(15,23,42,.07)}.card h2{margin:0 0 18px;font-size:18px}.rows{display:grid;gap:13px}.row{display:flex;justify-content:space-between;gap:20px;padding-bottom:12px;border-bottom:1px solid var(--line)}.row:last-child{padding-bottom:0;border:0}.label{color:var(--muted)}.value{font-weight:700;text-align:right}.online{color:var(--green)}.danger{grid-column:1/-1;border-color:#fecaca;background:#fffafa}.danger p{max-width:650px;color:var(--muted);line-height:1.55}.shutdown{padding:11px 18px;border:0;border-radius:10px;background:#dc2626;color:#fff;font-weight:750;cursor:pointer}.shutdown:hover{background:#b91c1c}.shutdown:disabled{opacity:.55;cursor:wait}.message{margin-top:12px;color:var(--muted)}.error{color:var(--red)}@media(max-width:700px){.server-page{padding:14px}.grid{grid-template-columns:1fr}.card{padding:18px}}
+</style>
+</head>
+<body>
+<main class="server-page">
+  <div class="wrap">
+    <header class="head">
+      <div class="eyebrow">Hệ thống</div>
+      <h1>Quản lý máy chủ</h1>
+      <p>Theo dõi trạng thái, bản quyền và điều khiển máy chủ ThimPOS.</p>
+    </header>
+    <div class="grid">
+      <section class="card">
+        <h2>Trạng thái</h2>
+        <div class="rows">
+          <div class="row"><span class="label">Máy chủ</span><span id="status" class="value">Đang tải…</span></div>
+          <div class="row"><span class="label">Thời gian hoạt động</span><span id="uptime" class="value">—</span></div>
+          <div class="row"><span class="label">Thời gian máy chủ</span><span id="serverTime" class="value">—</span></div>
+        </div>
+      </section>
+      <section class="card">
+        <h2>Thông tin bản quyền</h2>
+        <div class="rows">
+          <div class="row"><span class="label">Trạng thái</span><span id="licenseStatus" class="value">Đang tải…</span></div>
+          <div class="row"><span class="label">Người đăng ký</span><span id="registrant" class="value">—</span></div>
+          <div class="row"><span class="label">Hạn sử dụng</span><span id="expiresAt" class="value">—</span></div>
+        </div>
+      </section>
+      <section class="card danger">
+        <h2>Tắt máy chủ</h2>
+        <p>Thao tác này sẽ dừng ThimPOS ngay trên máy đang chạy. Các trình duyệt sẽ không thể sử dụng hệ thống cho đến khi máy chủ được khởi động lại.</p>
+        <button id="shutdown" class="shutdown" type="button">Tắt máy chủ</button>
+        <div id="message" class="message"></div>
+      </section>
+    </div>
+  </div>
+</main>
+<link rel="stylesheet" href="/thimpos.css">
+<script src="/thimpos.js" defer></script>
+<script>
+const $=id=>document.getElementById(id);
+const api='/api/server-management';
+
+async function get(path){
+ const response=await fetch(api+path);
+ const body=await response.json().catch(()=>null);
+ if(response.status===401){location.href='/auth/login.html';throw new Error('Bạn cần đăng nhập.')}
+ if(!response.ok||!body?.success)throw new Error(body?.error?.message||`Không thể tải dữ liệu (${response.status}).`);
+ return body.data;
+}
+function duration(seconds){
+ const days=Math.floor(seconds/86400),hours=Math.floor(seconds%86400/3600),minutes=Math.floor(seconds%3600/60);
+ return [days&&`${days} ngày`,hours&&`${hours} giờ`,`${minutes} phút`].filter(Boolean).join(' ');
+}
+function licenseDate(value){
+ if(!value)return '—';
+ const date=new Date(value);
+ return Number.isNaN(date.getTime())?value:date.toLocaleString('vi-VN');
+}
+async function load(){
+ try{
+  const [status,license]=await Promise.all([get('/status'),get('/license')]);
+  $('status').textContent=status.status==='running'?'Đang hoạt động':'Đang tắt';
+  $('status').classList.add('online');
+  $('uptime').textContent=duration(status.uptime_seconds);
+  $('serverTime').textContent=new Date(status.server_time*1000).toLocaleString('vi-VN');
+  $('licenseStatus').textContent=license.valid?'Hợp lệ':(license.verification_enabled?'Không hợp lệ':'Đã tắt kiểm tra (dev)');
+  $('licenseStatus').classList.add(license.valid?'online':'error');
+  $('registrant').textContent=license.registrant_name||'—';
+  $('expiresAt').textContent=licenseDate(license.expires_at);
+ }catch(error){
+  $('message').textContent=error.message;
+  $('message').classList.add('error');
+ }
+}
+$('shutdown').addEventListener('click',async()=>{
+ if(!confirm('Bạn chắc chắn muốn tắt máy chủ ThimPOS?'))return;
+ const confirmation=prompt('Nhập TAT MAY CHU để xác nhận:');
+ if(confirmation!=='TAT MAY CHU'){if(confirmation!==null)alert('Nội dung xác nhận không đúng.');return}
+ const button=$('shutdown');button.disabled=true;button.textContent='Đang tắt…';
+ try{
+  const response=await fetch(api+'/shutdown',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirmation:'SHUTDOWN'})});
+  const body=await response.json().catch(()=>null);
+  if(!response.ok||!body?.success)throw new Error(body?.error?.message||`Không thể tắt máy chủ (${response.status}).`);
+  $('message').textContent='Máy chủ đang tắt. Bạn có thể đóng trang này.';
+  $('status').textContent='Đang tắt';
+  $('status').classList.remove('online');
+ }catch(error){
+  $('message').textContent=error.message;$('message').classList.add('error');
+  button.disabled=false;button.textContent='Tắt máy chủ';
+ }
+});
+load();
+</script>
+</body>
+</html>
