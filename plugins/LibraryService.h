@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -24,6 +25,7 @@ class LibraryService : public drogon::Plugin<LibraryService>
 
     std::vector<LibraryFile> listFiles() const;
     LibraryFile saveFile(const drogon::HttpFile &file);
+    std::optional<std::string> readFile(const std::string &name) const;
     bool removeFile(const std::string &name);
 
   private:

@@ -4,6 +4,9 @@
 
 #include <drogon/MultiPart.h>
 
+#include <algorithm>
+#include <cctype>
+
 using namespace drogon;
 
 namespace
@@ -26,6 +29,37 @@ HttpResponsePtr errorResponse(const std::string &message, HttpStatusCode status)
     auto response = HttpResponse::newHttpJsonResponse(body);
     response->setStatusCode(status);
     return response;
+}
+
+std::string mimeTypeFor(const std::string &name)
+{
+    const auto dot = name.find_last_of('.');
+    if (dot == std::string::npos)
+        return "application/octet-stream";
+    auto extension = name.substr(dot);
+    std::transform(extension.begin(), extension.end(), extension.begin(),
+                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    if (extension == ".png")
+        return "image/png";
+    if (extension == ".jpg" || extension == ".jpeg")
+        return "image/jpeg";
+    if (extension == ".gif")
+        return "image/gif";
+    if (extension == ".webp")
+        return "image/webp";
+    if (extension == ".svg")
+        return "image/svg+xml";
+    if (extension == ".pdf")
+        return "application/pdf";
+    if (extension == ".txt")
+        return "text/plain; charset=utf-8";
+    if (extension == ".csv")
+        return "text/csv; charset=utf-8";
+    if (extension == ".json")
+        return "application/json";
+    if (extension == ".zip")
+        return "application/zip";
+    return "application/octet-stream";
 }
 }  // namespace
 
@@ -96,6 +130,28 @@ Task<HttpResponsePtr> LibraryController::remove(HttpRequestPtr req, std::string 
     catch (const std::invalid_argument &error)
     {
         co_return errorResponse(error.what(), k400BadRequest);
+    }
+    catch (const std::exception &error)
+    {
+        co_return errorResponse(error.what(), k500InternalServerError);
+    }
+}
+
+Task<HttpResponsePtr> LibraryController::download(HttpRequestPtr, std::string name)
+{
+    try
+    {
+        auto content = app().getPlugin<LibraryService>()->readFile(name);
+        if (!content)
+            co_return HttpResponse::newNotFoundResponse();
+        auto response = HttpResponse::newHttpResponse();
+        response->setContentTypeString(mimeTypeFor(name));
+        response->setBody(std::move(*content));
+        co_return response;
+    }
+    catch (const std::invalid_argument &)
+    {
+        co_return HttpResponse::newNotFoundResponse();
     }
     catch (const std::exception &error)
     {
